@@ -176,6 +176,12 @@ No external backend exists.
 
 ### Components
 
+**Single instance.** Only one host may own the camera and the port. A second launch does not
+compete: the Tauri shell probes `/healthz` and attaches its window to the running host instead of
+spawning, and `watchpost serve` reports where the existing host is and exits `0`. A port held by
+something that is not Watchpost is the only failure. An attached shell neither kills the host on
+exit nor follows it if it dies — it did not start it.
+
 **Camera service** (`camera.py`, `capture.py`) — enumerates devices, resolves the configured
 camera to a current index, runs a single `ffmpeg` process, supervises and restarts it, publishes
 camera health.

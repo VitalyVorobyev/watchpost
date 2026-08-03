@@ -188,28 +188,32 @@ fn check_local_trust() -> bool {
     false
 }
 
+/// One `/healthz` request. True when a Watchpost is answering on the port.
+fn host_responds() -> bool {
+    let mut probe = Command::new("curl");
+    probe.args(["-fsS", "-m", "2"]);
+    // Verify against Watchpost's own CA rather than passing -k: the probe should fail if
+    // the certificate is wrong, since that is exactly what would break the window.
+    if let Some(ca) = storage_root().map(|root| root.join("tls/ca.crt")) {
+        if tls_enabled() && ca.is_file() {
+            probe.arg("--cacert").arg(ca);
+        }
+    }
+    probe
+        .arg(format!("{}://127.0.0.1:{PORT}/healthz", scheme()))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
 /// Poll `/healthz` until the host answers. The window stays hidden until then so the user
 /// never sees a connection error that is really just startup.
 fn wait_until_ready() -> bool {
     let deadline = Instant::now() + READY_TIMEOUT;
     while Instant::now() < deadline {
-        let mut probe = Command::new("curl");
-        probe.args(["-fsS", "-m", "2"]);
-        // Verify against Watchpost's own CA rather than passing -k: the probe should fail
-        // if the certificate is wrong, since that is exactly what would break the window.
-        if let Some(ca) = storage_root().map(|root| root.join("tls/ca.crt")) {
-            if tls_enabled() && ca.is_file() {
-                probe.arg("--cacert").arg(ca);
-            }
-        }
-        let ok = probe
-            .arg(format!("{}://127.0.0.1:{PORT}/healthz", scheme()))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false);
-        if ok {
+        if host_responds() {
             return true;
         }
         thread::sleep(Duration::from_millis(400));
@@ -221,9 +225,18 @@ fn main() {
     let server = Arc::new(Mutex::new(None::<Child>));
     let guard = ServerGuard(Arc::clone(&server));
 
-    match spawn_server() {
-        Ok(child) => *server.lock().unwrap() = Some(child),
-        Err(error) => eprintln!("[watchpost] could not start the server: {error}"),
+    // Attach to a host that is already running rather than fighting it for the port.
+    // Launching a second copy of an app that is already up should show you the app, not
+    // an error — and spawning anyway would open the camera, fail to bind, and disturb the
+    // instance that already owns the device on its way out.
+    let attached = host_responds();
+    if attached {
+        println!("[watchpost] a host is already running on {PORT}; attaching to it");
+    } else {
+        match spawn_server() {
+            Ok(child) => *server.lock().unwrap() = Some(child),
+            Err(error) => eprintln!("[watchpost] could not start the server: {error}"),
+        }
     }
 
     let for_setup = Arc::clone(&server);
@@ -234,7 +247,7 @@ fn main() {
             let window = app.get_webview_window("main").expect("main window");
             let has_server = for_setup.lock().unwrap().is_some();
 
-            let ready = has_server && wait_until_ready();
+            let ready = attached || (has_server && wait_until_ready());
             if ready {
                 check_local_trust();
                 window.navigate(host_url().parse().expect("valid host url"))?;
@@ -257,7 +270,9 @@ fn main() {
             let watched = Arc::clone(&for_setup);
             let handle = app.handle().clone();
             thread::spawn(move || {
-                if !ready {
+                // Not when attached: that host belongs to someone else, and closing this
+                // window must not take it down or follow it if it goes.
+                if !ready || attached {
                     return;
                 }
                 loop {

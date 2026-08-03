@@ -7,9 +7,13 @@ rather than replacing it. See ADR-0005.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import socket
+import ssl
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import uvicorn
@@ -47,6 +51,29 @@ def _port_available(host: str, port: int) -> bool:
         except OSError:
             return False
     return True
+
+
+def _running_host(port: int) -> str | None:
+    """The base URL of a Watchpost already serving on this port, or None.
+
+    Both schemes are tried because the running instance decides its own, and a stale
+    ``config.json`` is not authoritative about a process that is already up. Certificate
+    verification is off deliberately: this is a loopback identity check against a public,
+    unauthenticated endpoint, not a trust decision.
+    """
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
+    for scheme in ("http", "https"):
+        base = f"{scheme}://127.0.0.1:{port}"
+        try:
+            with urllib.request.urlopen(f"{base}/healthz", timeout=2, context=context) as response:  # noqa: S310
+                if json.load(response).get("ok") is True:
+                    return base
+        except (urllib.error.URLError, OSError, ValueError):
+            continue
+    return None
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -95,10 +122,20 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(args.verbose)
 
     if not _port_available(args.host, args.port):
+        # Another Watchpost holding the port is not an error: it is already doing the job
+        # this command was asked to do. Say where it is and leave it alone — starting a
+        # second one would open the camera, fail to bind, and disturb the first on its way
+        # out, because uvicorn runs the ASGI lifespan before it binds.
+        existing = _running_host(args.port)
         print()
-        print(f"  Port {args.port} is already in use — Watchpost is probably already running.")
-        print("  Stop it first:")
-        print('      pkill -f "watchpost serve"')
+        if existing:
+            print(f"  Watchpost is already running on port {args.port}.")
+            print(f"    Mac       {existing}/host")
+            print('    Stop it   pkill -f "watchpost serve"')
+            print()
+            return 0
+        print(f"  Port {args.port} is held by something that is not Watchpost.")
+        print("  Free it, or choose another port with --port.")
         print()
         return 1
 
