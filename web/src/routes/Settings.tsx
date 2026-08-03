@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { CameraOption, Settings as SettingsModel } from "../api/types";
 import { Banner, Card, Empty, formatBytes } from "../components/ui";
@@ -51,16 +51,38 @@ function Slider({
   );
 }
 
+/** Stable identity for a select option. UID when the host knows one, name otherwise —
+ *  ffmpeg reports a name for every device while system_profiler omits some UIDs. */
+function cameraValue(camera: CameraOption): string {
+  return camera.uid ?? camera.name;
+}
+
 export function Settings() {
   const [settings, setSettings] = useState<SettingsModel | null>(null);
   const [cameras, setCameras] = useState<CameraOption[]>([]);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Enumerating spawns ffmpeg and system_profiler, so it is done on demand rather than on
+  // a timer. Reconnecting a Continuity Camera is a deliberate act; the user can say when.
+  const rescan = useCallback(async () => {
+    setScanning(true);
+    try {
+      setCameras(await api.cameras());
+    } catch {
+      /* the existing list stays; the camera status pill already reports trouble */
+    } finally {
+      setScanning(false);
+    }
+  }, []);
+
   useEffect(() => {
     api.settings().then(setSettings).catch((exc) => setError(exc.message));
-    api.cameras().then(setCameras).catch(() => undefined);
-  }, []);
+    void rescan();
+  }, [rescan]);
+
+  const selectedCamera = cameras.find((camera) => camera.selected);
 
   const patch = async (update: Partial<SettingsModel>) => {
     setError(null);
@@ -83,29 +105,42 @@ export function Settings() {
 
       <Card title="Camera">
         <div className="field">
-          <label className="field__label" htmlFor="camera">
-            Source
-          </label>
+          <div className="field__head">
+            <label className="field__label" htmlFor="camera">
+              Source
+            </label>
+            <button className="btn btn--quiet" onClick={rescan} disabled={scanning}>
+              {scanning ? "Scanning…" : "Rescan"}
+            </button>
+          </div>
           <select
             id="camera"
-            value={settings.camera_uid ?? settings.camera_name ?? ""}
+            // Driven by the option the host marked selected rather than by the raw setting:
+            // the host always includes the configured camera, so the control can never show
+            // a different one than capture is using.
+            value={selectedCamera ? cameraValue(selectedCamera) : ""}
             onChange={(event) => {
-              const chosen = cameras.find(
-                (camera) => (camera.uid ?? camera.name) === event.target.value,
-              );
-              if (chosen) void api.selectCamera(chosen.name, chosen.uid).then(setSettings);
+              const chosen = cameras.find((camera) => cameraValue(camera) === event.target.value);
+              if (!chosen) return;
+              void api.selectCamera(chosen.name, chosen.uid).then((next) => {
+                setSettings(next);
+                void rescan();
+              });
             }}
           >
             {cameras.length === 0 && <option value="">No cameras detected</option>}
             {cameras.map((camera) => (
-              <option key={camera.uid ?? camera.name} value={camera.uid ?? camera.name}>
+              <option key={cameraValue(camera)} value={cameraValue(camera)}>
                 {camera.name}
+                {camera.present ? "" : " — not connected"}
               </option>
             ))}
           </select>
           <span className="field__hint">
             Changing the camera restarts capture. Cameras are remembered by identity, not by
-            position, so plugging in another device will not switch the source.
+            position, so plugging in another device will not switch the source. A camera that
+            is not connected stays in this list and is picked up automatically when it returns
+            — Continuity Camera leaves the list whenever the iPhone does.
           </span>
         </div>
       </Card>

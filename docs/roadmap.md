@@ -18,13 +18,14 @@ the system being built is described in [`design.md`](design.md).
 | ✅ | Run motion detection on the live frame stream |
 | ✅ | Save a playable event clip with correct pre-roll |
 | ✅ | Expose a minimal local status endpoint |
-| 🚧 | Verify access from an iPhone on the same network |
+| ✅ | Verify access from an iPhone on the same network |
 
 **Exit condition:** one end-to-end event can be detected, recorded, and opened from the phone.
 
-**Status (2026-08-03):** the pipeline is verified end to end on a Logitech StreamCam — motion
-produces a playable 1280x720 H.264 clip with correct pre-roll, Range requests return `206`,
-and a clip reaches `readyState 4` in a real browser. Only the physical iPhone check remains.
+**Status (2026-08-03):** met. The pipeline is verified end to end on a Logitech StreamCam —
+motion produces a playable 1280x720 H.264 clip with correct pre-roll, Range requests return
+`206`, and a clip reaches `readyState 4` in a real browser. Confirmed from a physical iPhone
+and iPad on the LAN.
 
 ---
 

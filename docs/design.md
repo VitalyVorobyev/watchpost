@@ -99,6 +99,8 @@ Physical and platform facts that shape the product. These are not bugs.
 | **A LAN HTTP origin is not a secure context on iOS.** | Add-to-Home-Screen works; Service Workers, offline caching, and Web Push do not. See [ADR-0009](adrs/0009-ios-platform-constraints.md). |
 | **`<img>` and `<video>` cannot set request headers.** | Media endpoints accept the token as a `?t=` query parameter as well as a bearer header. |
 | **USB cameras disconnect and re-enumerate.** | The capture supervisor restarts with backoff and reports camera health as product state. |
+| **An installed iOS web app has its own `localStorage`,** separate from Safari's. | The pairing token has to arrive in the launch URL. The manifest's `start_url` carries it, and the client keeps `?t=` in the address bar until it is running standalone. See [ADR-0009](adrs/0009-ios-platform-constraints.md). |
+| **Continuity Camera leaves the device list with the phone.** | The host remembers every camera it has seen and keeps absent ones selectable, rather than offering only what is attached. |
 
 ---
 
@@ -307,10 +309,11 @@ Base path `/api/v1`. All endpoints require the token except `/healthz`.
 | `GET` | `/thumbs/{id}.jpg` | thumbnail |
 | `GET` | `/preview.mjpeg` | live preview, `multipart/x-mixed-replace` |
 | `GET` | `/snapshot.jpg` | single preview frame (polling fallback) |
-| `GET` | `/cameras` | enumerated devices with name and UID |
-| `PUT` | `/camera` | select a camera |
+| `GET` | `/cameras` | selectable devices: name, UID, `selected`, `present` |
+| `PUT` | `/camera` | select a camera, attached or not |
 | `GET` `PUT` | `/settings` | read and update settings |
 | `GET` | `/healthz` | liveness, unauthenticated |
+| `GET` | `/manifest.webmanifest` | web manifest, unauthenticated; `start_url` carries a verified `?t=` |
 
 The state snapshot is the contract that keeps interfaces consistent:
 
@@ -339,6 +342,10 @@ host is never intentionally reachable from outside the LAN.
   `?t=<token>` because `<img>` and `<video>` cannot set headers.
 - The Mac host screen renders a QR code for `http://<lan-ip>:8787/?t=<token>`; the phone scans it
   once and persists the token in `localStorage`.
+- The phone keeps `?t=` in its address bar until the app is installed to the home screen, and
+  strips it once running standalone. An installed iOS web app has a storage container separate
+  from Safari's, so the launch URL is the only way the token reaches it
+  ([ADR-0009](adrs/0009-ios-platform-constraints.md)).
 - The host screen cannot pair by scanning — it is the screen that draws the code. It receives the
   token the same way the phone does, from a `?t=` link: the startup banner prints
   `http://127.0.0.1:<port>/host?t=<token>`, and the Tauri shell reads the `0600` token file and

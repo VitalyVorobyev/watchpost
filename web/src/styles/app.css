@@ -307,6 +307,17 @@ a {
   width: 100%;
 }
 
+/* A secondary action sitting inline with a field label. Visually light, but it keeps the
+   full 44px height — it is reachable from the phone, where a smaller target would fail. */
+.btn--quiet {
+  padding: 0 var(--s3);
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
 /* The primary action. Deliberately the largest element on the Home screen — the UX brief
  * asks that the main action always be obvious. */
 .armbtn {

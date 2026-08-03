@@ -20,9 +20,18 @@ from PIL import Image
 
 from . import __version__
 from .auth import TokenStore
-from .camera import CameraDevice, CameraError, CaptureMode, list_devices, pick_default
+from .camera import (
+    CameraDevice,
+    CameraError,
+    CameraOption,
+    CaptureMode,
+    camera_options,
+    list_devices,
+    pick_default,
+    same_device,
+)
 from .capture import CaptureService, prune_ring
-from .config import ConfigStore, Settings
+from .config import ConfigStore, KnownCamera, Settings
 from .detect import Detection, MotionDetector
 from .paths import Paths
 from .preview import PreviewService
@@ -198,14 +207,54 @@ class Application:
         return settings
 
     def select_camera(self, name: str, uid: str | None) -> Settings:
+        """Select a camera by identity, attached or not.
+
+        Choosing an absent camera is legitimate — it is how a user re-arms on a Continuity
+        Camera before the phone is back. Capture reports ``disconnected`` and retries with
+        backoff until the device returns, which is the same path an unplugged USB camera
+        takes.
+        """
+        self._remember_cameras([CameraDevice(index=-1, name=name, uid=uid)])
         return self.update_settings({"camera_name": name, "camera_uid": uid})
 
-    def cameras(self) -> list[CameraDevice]:
+    def cameras(self) -> list[CameraOption]:
+        """Selectable cameras: everything attached, plus everything seen before.
+
+        Enumerating is also how cameras become known, so merely opening the settings
+        screen while a camera is plugged in is enough to keep it selectable later.
+        """
         try:
-            return list_devices()
+            attached = list_devices()
         except Exception:  # noqa: BLE001
             log.exception("camera enumeration failed")
-            return []
+            attached = []
+
+        self._remember_cameras(attached)
+        settings = self.config.settings
+        return camera_options(
+            attached,
+            [(entry.name, entry.uid) for entry in settings.known_cameras],
+            settings.camera_name,
+            settings.camera_uid,
+        )
+
+    def _remember_cameras(self, attached: list[CameraDevice]) -> None:
+        """Add newly seen cameras to the remembered list, persisting only on a change.
+
+        Written through ``config.update`` rather than ``update_settings`` deliberately:
+        this is bookkeeping, not a capture-shaping change, and must not restart the camera.
+        """
+        known = list(self.config.settings.known_cameras)
+        added = [
+            KnownCamera(name=device.name, uid=device.uid)
+            for device in attached
+            if not any(same_device(device.name, device.uid, e.name, e.uid) for e in known)
+        ]
+        if not added:
+            return
+        merged = known + added
+        self.config.update({"known_cameras": [entry.model_dump() for entry in merged]})
+        log.info("remembered new cameras: %s", ", ".join(entry.name for entry in added))
 
     # -- capture callbacks ---------------------------------------------------
 

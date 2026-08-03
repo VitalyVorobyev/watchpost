@@ -65,6 +65,9 @@ export interface CameraOption {
   name: string;
   uid: string | null;
   selected: boolean;
+  /** False for a camera the host remembers but that is not attached right now. Still
+   *  selectable — capture picks it up when it comes back. */
+  present: boolean;
 }
 
 export interface Pairing {

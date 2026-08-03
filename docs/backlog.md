@@ -30,7 +30,7 @@ top of their section. When an item is done, tick it here *and* update the matchi
 - [x] Vite + React 19 + TS scaffold, `bun` as package manager
 - [x] `styles/tokens.css` — colour, spacing, radius, type; light and dark
 - [x] Typed API client + `useAppState` SSE hook with backoff reconnection
-- [x] Token bootstrap from `?t=`, persist to `localStorage`, strip from the URL
+- [x] Token bootstrap from `?t=`, persist to `localStorage`, strip from the URL once installed
 - [x] Home: status, arm/disarm, preview, latest event, storage summary
 - [x] Events list: thumbnails, grouping by day, viewed state, empty state
 - [x] Event detail: playback, metadata, download, delete with confirmation
@@ -39,13 +39,16 @@ top of their section. When an item is done, tick it here *and* update the matchi
 - [x] Offline / reconnecting / loading / empty / error states throughout
 - [x] `manifest.webmanifest` + icons for Add-to-Home-Screen
 
-## Now — Milestone D: iPhone verification
+## Done — Milestone D: iPhone verification
 
-- [ ] Bind `0.0.0.0`, confirm reachability from the phone
-- [ ] QR pairing round trip
-- [ ] Live state and preview on the phone
-- [ ] Clip playback in Safari (proves Range → `206`)
-- [ ] Add-to-Home-Screen
+Verified on a physical iPhone and iPad, 2026-08-03. Three defects only a real device exposed;
+all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraints.md).
+
+- [x] Bind `0.0.0.0`, confirm reachability from the phone
+- [x] QR pairing round trip
+- [x] Live state and preview on the phone
+- [x] Clip playback in Safari (proves Range → `206`)
+- [x] Add-to-Home-Screen
 
 ## Done — Milestone E: Tauri shell
 
@@ -122,5 +125,13 @@ top of their section. When an item is done, tick it here *and* update the matchi
   user to scan a code that was never rendered. The startup banner and the Tauri shell now both
   open `/host?t=<token>`. Deliberately fixed by handing the host a token rather than by
   exempting loopback from auth, which would have let any visited web page drive the API.
+- ~~**Add-to-Home-Screen installed an unauthenticated app.**~~ Closed. An installed iOS web app
+  has a `localStorage` separate from Safari's, so the token saved during pairing was invisible to
+  it, and the client had already stripped `?t=` from the URL that Add-to-Home-Screen captures.
+  The manifest is now served with a token-bearing `start_url`, and the token stays in the address
+  bar until the app runs standalone.
+- ~~**Continuity Camera could not be re-selected.**~~ Closed. The iPhone leaves the AVFoundation
+  device list when it goes away, and the picker offered only attached devices, so the entry
+  vanished permanently. Seen cameras are remembered and stay selectable while absent.
 - **Multiple clients on `/preview.mjpeg`.** Each connection gets its own JPEG encode. Fine for
   two clients; needs a shared encoder if it grows.

@@ -18,12 +18,22 @@ log = logging.getLogger(__name__)
 GIB = 1024**3
 
 
+class KnownCamera(BaseModel):
+    """A camera this install has seen at least once."""
+
+    name: str
+    uid: str | None = None
+
+
 class Settings(BaseModel):
     """Everything the user can change. Persisted verbatim to config.json."""
 
     # Camera identity — never an index. See ADR-0004.
     camera_name: str | None = None
     camera_uid: str | None = None
+    # Every camera seen so far, so an intermittent one — Continuity Camera leaves the
+    # device list with the phone — stays selectable while it is away.
+    known_cameras: list[KnownCamera] = Field(default_factory=list)
     width: int = Field(default=1280, ge=160, le=4096)
     height: int = Field(default=720, ge=120, le=2160)
     fps: int = Field(default=30, ge=1, le=60)

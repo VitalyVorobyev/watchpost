@@ -108,6 +108,12 @@ work. Tick completed backlog items and update the matching `roadmap.md` row.
   frames with `capture._fill()`; a bare `read(n)` looks like EOF and kills capture.
 - `<img>` and `<video>` cannot set headers, so media endpoints also accept `?t=<token>`.
 - No Service Worker over LAN HTTP. Do not write offline-caching code; it will not run.
+- An installed home-screen app gets its **own** `localStorage`. The pairing token must arrive in
+  the launch URL: `/manifest.webmanifest` serves a `start_url` carrying a verified `?t=`, and the
+  client only strips `?t=` from the address bar once `isStandalone()`. Strip it in a tab and
+  Add-to-Home-Screen installs a permanently unauthenticated app.
+- Continuity Camera leaves the AVFoundation device list with the phone. Never offer only attached
+  devices: remembered-but-absent cameras stay selectable (`camera_options()`).
 - A closed lid stops capture regardless of `caffeinate`.
 
 **Code.** Small, testable modules with explicit interfaces. Pure logic — detector, state machine,

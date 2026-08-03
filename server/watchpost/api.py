@@ -12,6 +12,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -200,16 +201,17 @@ def create_app(application: Application, web_dist: Path | None = None) -> FastAP
 
     @router.get("/cameras")
     def cameras() -> dict:
-        settings = application.config.settings
         return {
             "cameras": [
                 {
-                    "name": device.name,
-                    "uid": device.uid,
-                    "selected": device.uid == settings.camera_uid
-                    or device.name == settings.camera_name,
+                    "name": option.name,
+                    "uid": option.uid,
+                    "selected": option.selected,
+                    # False for a remembered camera that is not attached right now. It stays
+                    # selectable: capture retries with backoff and picks it up on return.
+                    "present": option.present,
                 }
-                for device in application.cameras()
+                for option in application.cameras()
             ]
         }
 
@@ -248,11 +250,11 @@ def create_app(application: Application, web_dist: Path | None = None) -> FastAP
     def healthz() -> dict:
         return {"ok": True, "version": __version__}
 
-    _mount_client(api, web_dist)
+    _mount_client(api, application, web_dist)
     return api
 
 
-def _mount_client(api: FastAPI, web_dist: Path | None) -> None:
+def _mount_client(api: FastAPI, application: Application, web_dist: Path | None) -> None:
     """Serve the built web client, with SPA fallback for client-side routes."""
     if web_dist is None or not (web_dist / "index.html").exists():
 
@@ -272,6 +274,28 @@ def _mount_client(api: FastAPI, web_dist: Path | None) -> None:
         api.mount("/assets", StaticFiles(directory=assets), name="assets")
 
     index = web_dist / "index.html"
+    manifest = web_dist / "manifest.webmanifest"
+
+    @api.get("/manifest.webmanifest")
+    def webmanifest(t: str | None = None) -> Response:
+        """The manifest, with a `start_url` that carries the pairing token.
+
+        An installed iOS web app runs in its own storage container: the token Safari saved
+        during pairing is invisible to it. iOS 16.4+ launches the app at `start_url`, so
+        putting the token there is the only way an installed app starts authenticated.
+
+        This route is intentionally unauthenticated — it echoes back a token the caller
+        already supplied and reveals nothing otherwise. An unrecognised token is dropped
+        rather than reflected, so a crafted link cannot bake a bogus one into an install.
+        """
+        try:
+            payload = json.loads(manifest.read_text())
+        except (OSError, ValueError):
+            return JSONResponse({"detail": "manifest unavailable"}, status_code=404)
+
+        if t and application.tokens.verify(t):
+            payload["start_url"] = f"/?t={quote(t, safe='')}"
+        return JSONResponse(payload, media_type="application/manifest+json")
 
     @api.get("/{path:path}", response_class=HTMLResponse)
     def spa(path: str) -> Response:

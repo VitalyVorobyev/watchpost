@@ -12,6 +12,7 @@ import json
 import logging
 import re
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
@@ -54,8 +55,86 @@ class CaptureMode:
         return self.max_fps
 
 
+@dataclass(frozen=True)
+class CameraOption:
+    """A camera the user may choose, attached or not."""
+
+    name: str
+    uid: str | None
+    present: bool
+    selected: bool
+
+
 class CameraError(RuntimeError):
     """The configured camera could not be resolved to a live device."""
+
+
+def same_device(
+    name: str | None, uid: str | None, other_name: str | None, other_uid: str | None
+) -> bool:
+    """Whether two persisted identities denote the same camera.
+
+    UIDs win when both sides have one — two devices can share a name, and Continuity
+    Camera reuses "iPhone" across phones. Names are the fallback because ffmpeg supplies
+    them for every device while ``system_profiler`` omits some, notably the iPhone itself.
+    """
+    if uid and other_uid:
+        return uid == other_uid
+    return bool(name) and name == other_name
+
+
+def camera_options(
+    attached: Sequence[CameraDevice],
+    known: Sequence[tuple[str, str | None]],
+    selected_name: str | None,
+    selected_uid: str | None,
+) -> list[CameraOption]:
+    """Attached devices, plus remembered ones that are not attached right now.
+
+    Listing only what is attached makes an intermittent camera unselectable the moment it
+    goes away. Continuity Camera is intermittent *by design* — it leaves the AVFoundation
+    device list whenever the phone does — so a user who picks it once and then walks away
+    with the phone can never pick it again.
+
+    The configured camera is always included, even when it is neither attached nor
+    remembered, so the selector can never quietly display a different camera than the one
+    capture is actually configured for.
+    """
+    options: list[CameraOption] = [
+        CameraOption(
+            name=device.name,
+            uid=device.uid,
+            present=True,
+            selected=same_device(device.name, device.uid, selected_name, selected_uid),
+        )
+        for device in attached
+    ]
+
+    def already_listed(name: str, uid: str | None) -> bool:
+        return any(same_device(name, uid, o.name, o.uid) for o in options)
+
+    absent = [
+        CameraOption(
+            name=name,
+            uid=uid,
+            present=False,
+            selected=same_device(name, uid, selected_name, selected_uid),
+        )
+        for name, uid in known
+        if not already_listed(name, uid)
+    ]
+    options.extend(sorted(absent, key=lambda o: o.name))
+
+    if (selected_name or selected_uid) and not any(o.selected for o in options):
+        options.append(
+            CameraOption(
+                name=selected_name or selected_uid or "Unknown camera",
+                uid=selected_uid,
+                present=False,
+                selected=True,
+            )
+        )
+    return options
 
 
 def _run(args: list[str], timeout: float = 15.0) -> str:

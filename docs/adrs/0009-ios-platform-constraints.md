@@ -53,7 +53,39 @@ See [ADR-0005](0005-python-host-tauri-supervisor.md). Running from a terminal gr
 to the terminal; running under the app grants it to the app, which needs
 `NSCameraUsageDescription`. Users are prompted again when switching between the two.
 
-### 6. mDNS works, but IP is the reliable path
+### 6. An installed web app has its own storage container
+
+Add-to-Home-Screen does not merely bookmark the page: the installed app gets a `localStorage`
+separate from Safari's. A token saved while pairing in Safari is therefore **invisible** to the
+installed app, which launches unauthenticated and shows a permanent offline state with no way
+to recover from inside the app.
+
+The launch URL is the only channel that reaches the new container, so it has to carry the token.
+Two mechanisms, because iOS decides the launch URL differently across versions:
+
+- The host serves `/manifest.webmanifest` dynamically, echoing a verified `?t=` back as
+  `start_url`. iOS 16.4 and later launch at `start_url`.
+- The client strips `?t=` from the address bar **only once running standalone**. Older iOS
+  captures whatever is in the address bar at the moment of installation, so in a tab the token
+  must stay visible.
+
+The trade is that the token lingers in the phone's address bar and history until the app is
+installed. That is acceptable under the [ADR-0006](0006-lan-http-token-auth.md) threat model —
+the same token is already displayed as a QR code on the Mac and printed in the terminal — and
+it buys a feature that is otherwise simply broken.
+
+### 7. Continuity Camera leaves the device list with the phone
+
+The iPhone appears in AVFoundation enumeration only while it is nearby and available. Offering
+just the attached devices therefore made it unselectable the moment the phone left, permanently:
+the entry vanished from the picker and there was no way to name it again.
+
+Consequence: the host remembers every camera it has enumerated and keeps absent ones in the
+picker, marked as not connected. Selecting one is legitimate — capture reports `disconnected`
+and retries with backoff, exactly as it does for an unplugged USB camera, and picks the device
+up when it returns.
+
+### 8. mDNS works, but IP is the reliable path
 
 `Vitalys-MacBook-Pro.local` resolves from iOS on the same network, and it survives DHCP lease
 changes where a hard-coded IP does not. It also fails on networks with client isolation or
@@ -66,3 +98,6 @@ multicast filtering. The pairing QR therefore encodes the IP, and the host layou
 - The client has no offline-caching code to maintain, and no misleading offline UI.
 - Range support is a correctness requirement with a test, not an optimisation.
 - The lid constraint appears in the UI, so the user is not misled about coverage.
+- The pairing token stays in the phone's address bar until the app is installed. Deliberate:
+  Add-to-Home-Screen is unusable otherwise.
+- The camera picker lists cameras that are not attached. That is a feature, not stale data.
