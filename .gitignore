@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / web
+node_modules/
+web/dist/
+*.tsbuildinfo
+
+# Rust / Tauri
+target/
+
+# Runtime data must never be committed. The real storage root lives under
+# ~/Library/Application Support/Watchpost/, but guard against local overrides.
+data/
+*.db
+*.db-wal
+*.db-shm
+token
+clips/
+thumbs/
+ring/
+logs/
+*.mp4
+# MPEG-TS ring segments only — never plain *.ts, which would swallow TypeScript sources.
+ring/*.ts
