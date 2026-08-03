@@ -72,9 +72,12 @@ def lan_ip() -> str | None:
 
 
 class Application:
-    def __init__(self, paths: Paths, port: int = 8787) -> None:
+    def __init__(self, paths: Paths, port: int = 8787, tls: bool = False) -> None:
         self.paths = paths.ensure()
         self.port = port
+        # Set by the CLI, which resolves the persisted setting against --tls/--no-tls.
+        # Only affects the URLs handed out; the socket itself is uvicorn's business.
+        self.tls = tls
         self.config = ConfigStore(self.paths.config)
         self.tokens = TokenStore(self.paths.token)
         self.store = Store(self.paths)
@@ -119,7 +122,8 @@ class Application:
         self._ensure_camera_selected()
 
         ip = lan_ip()
-        url = f"http://{ip}:{self.port}" if ip else None
+        scheme = "https" if self.tls else "http"
+        url = f"{scheme}://{ip}:{self.port}" if ip else None
 
         def init(state: AppState) -> None:
             state.host.status = "running"

@@ -63,6 +63,9 @@ export interface Settings {
   retain_max_bytes: number;
   retain_max_age_days: number;
   arm_on_start: boolean;
+  capture_enabled: boolean;
+  /** Applied at startup, so changing it needs a restart of the host. */
+  tls_enabled: boolean;
 }
 
 export interface CameraOption {
@@ -78,4 +81,7 @@ export interface Pairing {
   url: string;
   lan_url: string;
   token: string;
+  tls: boolean;
+  /** Plaintext page where a device installs the CA. Null when TLS is off. */
+  trust_url: string | null;
 }

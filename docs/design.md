@@ -324,6 +324,9 @@ Base path `/api/v1`. All endpoints require the token except `/healthz`.
 | `GET` | `/healthz` | liveness, unauthenticated |
 | `GET` | `/manifest.webmanifest` | web manifest, unauthenticated; `start_url` carries a verified `?t=` |
 
+While TLS is on, a second listener on `port + 1` serves the CA certificate and the enrolment
+page in plaintext. It exposes nothing else — no token, no API, no media.
+
 The state snapshot is the contract that keeps interfaces consistent:
 
 ```jsonc
@@ -360,10 +363,13 @@ host is never intentionally reachable from outside the LAN.
   `http://127.0.0.1:<port>/host?t=<token>`, and the Tauri shell reads the `0600` token file and
   navigates there. There is deliberately **no** loopback exemption in the API: a bare
   `/host` with no stored token falls through to the pairing prompt like any other client.
-- The server binds `0.0.0.0` so the phone can reach it, over plain HTTP. Both the token and the
-  video stream are therefore visible to a LAN attacker who can observe traffic. This is an
-  accepted MVP risk, recorded in [ADR-0006](adrs/0006-lan-http-token-auth.md), with TLS on the
-  Phase 2 backlog.
+- The server binds `0.0.0.0` so the phone can reach it. **TLS is available and off by default**
+  (`tls_enabled`): Watchpost issues its own CA, signs a host certificate covering every address
+  it answers on, and serves the CA from a plaintext helper on `port + 1` so a device can trust it
+  before connecting ([ADR-0011](adrs/0011-self-signed-tls.md)). With TLS off, the token and the
+  video stream are visible to anyone who can observe the network — on WPA2-PSK that is anyone
+  holding the Wi-Fi password. That remains the documented default risk
+  ([ADR-0006](adrs/0006-lan-http-token-auth.md)).
 - No clip URL is unauthenticated. No analytics, no telemetry, no outbound network calls.
 - The token file and the storage root are outside the repository and never committed.
 

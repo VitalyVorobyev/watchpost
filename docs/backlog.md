@@ -92,7 +92,9 @@ all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraint
 
 ## Phase 2 — deferred, in priority order
 
-- [ ] **TLS on the LAN.** Unblocks Service Workers and Web Push. Prerequisite for notifications.
+- [x] **TLS on the LAN.** Self-signed CA, guided enrolment, off by default
+      ([ADR-0011](adrs/0011-self-signed-tls.md)). Unblocks Service Workers and Web Push.
+- [ ] Consider defaulting `tls_enabled` to true once enrolment has been proven on real devices
 - [ ] Bundle `ffmpeg` as a Tauri sidecar so Homebrew stops being a prerequisite
 - [ ] Freeze the Python runtime into a sidecar binary; ship a real `.app`
 - [ ] Sign and notarise; login-item startup
@@ -111,7 +113,7 @@ all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraint
 - [ ] Detection zones and ignore masks
 - [ ] Event deduplication and merging
 - [ ] Scheduled arming
-- [ ] Notifications *(blocked on TLS)*
+- [ ] Notifications *(unblocked by [ADR-0011](adrs/0011-self-signed-tls.md); needs an installed PWA over HTTPS)*
 
 ---
 

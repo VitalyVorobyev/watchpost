@@ -56,6 +56,8 @@ export function Host({ state, connection }: { state: AppState | null; connection
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [enabling, setEnabling] = useState(false);
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     api.pairing().then(setPairing).catch(() => undefined);
@@ -135,7 +137,28 @@ export function Host({ state, connection }: { state: AppState | null; connection
                 </div>
               </Card>
 
-              <Card title="Pair a phone">
+              {pairing?.trust_url && (
+                <Card title="Step 1 — trust this Mac">
+                  <div className="pairing">
+                    <QrCode value={pairing.trust_url} />
+                    <div className="pairing__info stack">
+                      <p style={{ margin: 0 }}>
+                        Scan this <strong>first</strong>, on each new device. It opens a page
+                        that installs the certificate — the page walks you through it, including
+                        the separate trust switch that iOS hides under{" "}
+                        <strong>General &rsaquo; About</strong>.
+                      </p>
+                      <p className="mono">{pairing.trust_url}</p>
+                      <span className="field__hint">
+                        Only the public certificate is served here, over plain HTTP. No access
+                        token, because this page cannot yet be encrypted.
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              <Card title={pairing?.trust_url ? "Step 2 — pair a phone" : "Pair a phone"}>
                 {pairing ? (
                   <div className="pairing">
                     <QrCode value={pairing.url} />
@@ -145,16 +168,62 @@ export function Host({ state, connection }: { state: AppState | null; connection
                         Screen</strong>.
                       </p>
                       <p className="mono">{pairing.lan_url}</p>
-                      <Banner tone="warn">
-                        This link contains the access token. Traffic on your network is not
-                        encrypted — anyone who can watch it can see the token and the video.
-                      </Banner>
+                      {pairing.tls ? (
+                        <Banner tone="info">
+                          Encrypted. The link still contains the access token, so treat it like a
+                          password — but nobody watching your network can read it or the video.
+                        </Banner>
+                      ) : (
+                        <Banner tone="warn">
+                          This link contains the access token. Traffic on your network is not
+                          encrypted — anyone who can watch it can see the token and the video.
+                        </Banner>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <p className="field__hint">Loading pairing details…</p>
                 )}
               </Card>
+
+              {pairing && !pairing.tls && (
+                <Card title="Encryption">
+                  <div className="stack stack--tight">
+                    <Banner tone="warn">
+                      Traffic is unencrypted. On a WPA2 network anyone who knows the Wi-Fi
+                      password can read the token and watch the video.
+                    </Banner>
+                    <button
+                      className="btn"
+                      disabled={enabling}
+                      onClick={() => {
+                        setEnabling(true);
+                        void api
+                          .updateSettings({ tls_enabled: true })
+                          .then(() => setEnabled(true))
+                          .catch((exc) =>
+                            setError(exc instanceof Error ? exc.message : "Could not enable"),
+                          )
+                          .finally(() => setEnabling(false));
+                      }}
+                    >
+                      Turn encryption on
+                    </button>
+                    {enabled ? (
+                      <Banner tone="info" title="Restart Watchpost to apply">
+                        The certificate is created at startup, so the host has to be restarted.
+                        Every device then needs to trust it once — a QR code for that appears
+                        here afterwards.
+                      </Banner>
+                    ) : (
+                      <span className="field__hint">
+                        Watchpost issues its own certificate. Each device trusts it once, in two
+                        steps that the setup page explains.
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              )}
             </div>
           </div>
 

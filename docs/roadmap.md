@@ -62,8 +62,9 @@ and iPad on the LAN.
 - Diagnostics view and structured logs.
 - Bundle `ffmpeg` as a Tauri sidecar so Homebrew is not a prerequisite.
 - Signed and notarised app bundle; login-item startup.
-- **TLS on the LAN** (self-signed CA or a local-domain certificate), which also unlocks Service
-  Workers and Web Push on iOS — see [ADR-0009](adrs/0009-ios-platform-constraints.md).
+- ~~**TLS on the LAN**~~ — done ahead of schedule with a self-signed CA and a guided per-device
+  enrolment flow ([ADR-0011](adrs/0011-self-signed-tls.md)). Off by default. This unblocks
+  Service Workers and Web Push on iOS, which Phase 3 notifications depended on.
 - Installation and usage documentation.
 - Automated tests over the camera-in-the-loop path, not just pure logic.
 - A release workflow that builds and publishes a signed `.dmg` on tag.
@@ -82,8 +83,9 @@ and iPad on the LAN.
 - Event deduplication and merging.
 - Richer thumbnails and event summaries.
 - Scheduled arming.
-- Notifications — **blocked on TLS from Phase 2**; Web Push on iOS requires a secure origin and
-  an installed PWA.
+- Notifications — no longer blocked: TLS landed in [ADR-0011](adrs/0011-self-signed-tls.md), so
+  a secure origin is available. Still requires an installed PWA and a device that has trusted the
+  CA.
 
 Any work in this phase must leave the motion-recording path working unchanged.
 

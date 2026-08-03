@@ -58,9 +58,14 @@ class Paths:
     def logs(self) -> Path:
         return self.root / "logs"
 
+    @property
+    def tls(self) -> Path:
+        """CA and host certificate. The private keys inside are written at mode 0600."""
+        return self.root / "tls"
+
     def ensure(self) -> Paths:
         """Create every directory. Idempotent."""
-        for directory in (self.root, self.clips, self.thumbs, self.ring, self.logs):
+        for directory in (self.root, self.clips, self.thumbs, self.ring, self.logs, self.tls):
             directory.mkdir(parents=True, exist_ok=True)
         return self
 

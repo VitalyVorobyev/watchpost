@@ -58,6 +58,11 @@ class Settings(BaseModel):
     # Whether the camera is open at all. Persisted: switching it off is a privacy choice,
     # and a restart silently undoing it is the wrong direction to fail in.
     capture_enabled: bool = True
+    # Serve HTTPS with the self-signed CA in the storage root. Off by default: turning it
+    # on requires installing and trusting that CA on every device, so it must be a
+    # deliberate act rather than something an upgrade does behind the user's back.
+    # See ADR-0011.
+    tls_enabled: bool = False
 
     @property
     def ring_window_s(self) -> float:

@@ -98,14 +98,41 @@ fn spawn_server() -> std::io::Result<Child> {
     Ok(child)
 }
 
+/// The storage root the server keeps its token, config and certificates in.
+fn storage_root() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(PathBuf::from(home).join("Library/Application Support/Watchpost"))
+}
+
+/// Whether the host is serving HTTPS, read from the same config.json the server reads.
+///
+/// A crude substring match rather than a JSON dependency: the shell needs exactly one
+/// boolean out of this file, and the server remains the only writer.
+fn tls_enabled() -> bool {
+    storage_root()
+        .and_then(|root| std::fs::read_to_string(root.join("config.json")).ok())
+        .map(|text| {
+            text.replace(char::is_whitespace, "")
+                .contains("\"tls_enabled\":true")
+        })
+        .unwrap_or(false)
+}
+
+fn scheme() -> &'static str {
+    if tls_enabled() {
+        "https"
+    } else {
+        "http"
+    }
+}
+
 /// The pairing token, read from the storage root the server writes it to.
 ///
 /// The host screen is the one that *displays* the pairing QR, so it cannot acquire a token
 /// by scanning one. The shell reads the same mode-0600 file the server created; it runs as
 /// the same user on the same machine, so this grants it nothing it did not already have.
 fn pairing_token() -> Option<String> {
-    let home = std::env::var_os("HOME")?;
-    let path = PathBuf::from(home).join("Library/Application Support/Watchpost/token");
+    let path = storage_root()?.join("token");
     let token = std::fs::read_to_string(path).ok()?.trim().to_owned();
     (!token.is_empty()).then_some(token)
 }
@@ -114,9 +141,10 @@ fn pairing_token() -> Option<String> {
 /// `secrets.token_urlsafe`, which emits only `[A-Za-z0-9_-]`, so no percent-encoding is
 /// needed. The client strips the query from the address bar once it has stored the token.
 fn host_url() -> String {
+    let base = format!("{}://127.0.0.1:{PORT}/host", scheme());
     match pairing_token() {
-        Some(token) => format!("http://127.0.0.1:{PORT}/host?t={token}"),
-        None => format!("http://127.0.0.1:{PORT}/host"),
+        Some(token) => format!("{base}?t={token}"),
+        None => base,
     }
 }
 
@@ -125,13 +153,17 @@ fn host_url() -> String {
 fn wait_until_ready() -> bool {
     let deadline = Instant::now() + READY_TIMEOUT;
     while Instant::now() < deadline {
-        let ok = Command::new("curl")
-            .args([
-                "-fsS",
-                "-m",
-                "2",
-                &format!("http://127.0.0.1:{PORT}/healthz"),
-            ])
+        let mut probe = Command::new("curl");
+        probe.args(["-fsS", "-m", "2"]);
+        // Verify against Watchpost's own CA rather than passing -k: the probe should fail
+        // if the certificate is wrong, since that is exactly what would break the window.
+        if let Some(ca) = storage_root().map(|root| root.join("tls/ca.crt")) {
+            if tls_enabled() && ca.is_file() {
+                probe.arg("--cacert").arg(ca);
+            }
+        }
+        let ok = probe
+            .arg(format!("{}://127.0.0.1:{PORT}/healthz", scheme()))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()

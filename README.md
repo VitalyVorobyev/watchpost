@@ -71,6 +71,16 @@ Screen**. That is the whole setup.
 <img src="docs/media/host-dark.png" width="760" alt="Mac host screen with pairing QR code">
 </div>
 
+### Turning on encryption
+
+Traffic is plain HTTP by default. To encrypt it, open the Mac window and choose **Turn
+encryption on**, then restart the host. Watchpost issues its own certificate authority and the
+host screen then shows two QR codes: the first opens a page that installs and trusts the
+certificate on the device, the second pairs as usual. One extra step per device, once.
+
+[ADR-0011](docs/adrs/0011-self-signed-tls.md) explains why it is self-signed rather than a real
+certificate, and why it is not the default.
+
 ### As a desktop app
 
 ```bash
@@ -124,6 +134,7 @@ clip creation is instant and lossless, and why an event survives a crash of the 
   watchpost.db   event metadata
   config.json    your settings
   token          pairing secret, mode 0600
+  tls/           self-signed CA and host certificate (keys mode 0600)
 ```
 
 Deleting an event deletes its clip. Nothing is uploaded anywhere, ever.
@@ -135,12 +146,15 @@ Worth knowing before you rely on it.
 - **The lid has to stay open.** Closing it suspends the Mac and stops monitoring. Watchpost
   blocks display and idle sleep while armed, but no software can defeat a closed lid without an
   external display and power.
-- **LAN traffic is unencrypted.** The pairing token and the video are visible to anyone who can
-  observe your network. That is a deliberate trade for setup simplicity on a home network —
-  see [ADR-0006](docs/adrs/0006-lan-http-token-auth.md). TLS is the top item in Phase 2.
-- **No offline mode or push notifications on iOS.** A plain-HTTP LAN origin is not a secure
-  context, so Service Workers and Web Push are unavailable until TLS lands
-  ([ADR-0009](docs/adrs/0009-ios-platform-constraints.md)).
+- **Encryption is off until you turn it on.** By default traffic is plain HTTP, so the pairing
+  token and the video are readable by anyone who can observe your network — on a WPA2 Wi-Fi that
+  is anyone with the password. Watchpost can issue its own certificate and serve HTTPS, with a
+  guided one-time trust step per device; turn it on from the Mac window. It is off by default
+  because enabling it would otherwise silently strand every already-paired phone. See
+  [ADR-0011](docs/adrs/0011-self-signed-tls.md).
+- **No offline mode or push notifications yet.** A plain-HTTP LAN origin is not a secure context,
+  so Service Workers and Web Push do not run. Turning on TLS lifts that restriction, but neither
+  feature is built ([ADR-0009](docs/adrs/0009-ios-platform-constraints.md)).
 - **Motion detection is motion detection.** It will fire on changing light, shadows, and pets.
   Person detection is Phase 3, behind the existing detector interface.
 - **Video only.** No audio is captured or recorded, deliberately.

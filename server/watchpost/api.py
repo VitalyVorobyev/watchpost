@@ -14,7 +14,7 @@ import os
 import signal
 from collections.abc import AsyncIterator
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -274,6 +274,14 @@ def create_app(application: Application, web_dist: Path | None = None) -> FastAP
             "url": f"{base}/?t={application.tokens.token}",
             "lan_url": base,
             "token": application.tokens.token,
+            "tls": application.tls,
+            # Where a device installs the CA before it can trust anything else. Plaintext
+            # by necessity, and carries no token — see ADR-0011.
+            "trust_url": (
+                f"http://{urlsplit(base).hostname}:{application.port + 1}/"
+                if application.tls and urlsplit(base).hostname
+                else None
+            ),
         }
 
     api.include_router(router)

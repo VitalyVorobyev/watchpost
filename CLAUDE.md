@@ -91,6 +91,10 @@ work. Tick completed backlog items and update the matching `roadmap.md` row.
   ([ADR-0010](docs/adrs/0010-capture-intent-and-shutdown.md)).
 - Shutdown is loopback-only. Do not expose it to the phone: a device that can stop the host
   can lock itself out of it.
+- TLS is self-signed and off by default. iOS silently rejects a server certificate over 398 days,
+  without a SAN, with an IP in a dNSName, or without `serverAuth` — `tls.py` encodes all four and
+  `test_tls.py` asserts them ([ADR-0011](docs/adrs/0011-self-signed-tls.md)). Never regenerate the
+  CA; only the leaf is reissued.
 - Keep capture, detection, recording, storage, and API concerns separate.
 - Keep the detector replaceable — the recorder consumes `Detection`, nothing more
   ([ADR-0007](docs/adrs/0007-detector-interface.md)).

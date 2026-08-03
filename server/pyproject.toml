@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5",
     "pillow>=12.3",
     "pydantic>=2.13",
+    "cryptography>=46",
 ]
 
 [project.scripts]
