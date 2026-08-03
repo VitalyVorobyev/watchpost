@@ -31,3 +31,7 @@ logs/
 *.mp4
 # MPEG-TS ring segments only — never plain *.ts, which would swallow TypeScript sources.
 ring/*.ts
+
+# uv
+.python-version
+uv.lock
