@@ -29,13 +29,24 @@ function usePath(): [string, (path: string) => void] {
   return [path, navigate];
 }
 
+/** Loopback means we are on the Mac running the host, where "scan the QR code" is circular
+ *  advice — this screen is the one that draws it. */
+function isLoopback(): boolean {
+  return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(window.location.hostname);
+}
+
 function Pairing() {
   const [value, setValue] = useState("");
+  const local = isLoopback();
   return (
     <div className="stack">
       <Empty
         title="Pair this device"
-        body="Open Watchpost on the Mac and scan the QR code shown there. If you cannot scan it, paste the access token below."
+        body={
+          local
+            ? "Open the Mac link printed in the terminal when the host started — it carries the access token. You can also read it from the token file in the storage root and paste it below."
+            : "Open Watchpost on the Mac and scan the QR code shown there. If you cannot scan it, paste the access token below."
+        }
       />
       <input
         className="mono"

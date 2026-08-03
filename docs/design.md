@@ -339,6 +339,11 @@ host is never intentionally reachable from outside the LAN.
   `?t=<token>` because `<img>` and `<video>` cannot set headers.
 - The Mac host screen renders a QR code for `http://<lan-ip>:8787/?t=<token>`; the phone scans it
   once and persists the token in `localStorage`.
+- The host screen cannot pair by scanning — it is the screen that draws the code. It receives the
+  token the same way the phone does, from a `?t=` link: the startup banner prints
+  `http://127.0.0.1:<port>/host?t=<token>`, and the Tauri shell reads the `0600` token file and
+  navigates there. There is deliberately **no** loopback exemption in the API: a bare
+  `/host` with no stored token falls through to the pairing prompt like any other client.
 - The server binds `0.0.0.0` so the phone can reach it, over plain HTTP. Both the token and the
   video stream are therefore visible to a LAN attacker who can observe traffic. This is an
   accepted MVP risk, recorded in [ADR-0006](adrs/0006-lan-http-token-auth.md), with TLS on the

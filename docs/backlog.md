@@ -117,5 +117,10 @@ top of their section. When an item is done, tick it here *and* update the matchi
   pruning (`Application._ring_floor`) for its whole life, and `build_clip` logs a warning when
   the assembled span is shorter than requested. This bit for real during development when
   settings were changed mid-event, producing a 2-second clip for a 58-second window.
+- ~~**The host screen could not pair itself.**~~ Closed. `/host` is the screen that *draws* the
+  pairing QR, so opening it without a token fell through to the pairing prompt — which told the
+  user to scan a code that was never rendered. The startup banner and the Tauri shell now both
+  open `/host?t=<token>`. Deliberately fixed by handing the host a token rather than by
+  exempting loopback from auth, which would have let any visited web page drive the API.
 - **Multiple clients on `/preview.mjpeg`.** Each connection gets its own JPEG encode. Fine for
   two clients; needs a shared encoder if it grows.

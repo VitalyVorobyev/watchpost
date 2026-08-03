@@ -70,7 +70,10 @@ def main(argv: list[str] | None = None) -> int:
     ip = lan_ip()
     print()
     print("  Watchpost")
-    print(f"    Mac      http://127.0.0.1:{args.port}/host")
+    # The Mac link carries the token too. The host screen is the one that *displays* the
+    # pairing QR, so it cannot be paired by scanning one — without this it lands on the
+    # pairing prompt and tells the user to scan a code that is never drawn.
+    print(f"    Mac      http://127.0.0.1:{args.port}/host?t={application.tokens.token}")
     if ip and args.host != "127.0.0.1":
         print(f"    Phone    http://{ip}:{args.port}/?t={application.tokens.token}")
     print(f"    Storage  {paths.root}")

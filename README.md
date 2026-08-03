@@ -56,10 +56,13 @@ The terminal prints two links:
 
 ```
   Watchpost
-    Mac      http://127.0.0.1:8787/host
+    Mac      http://127.0.0.1:8787/host?t=<token>
     Phone    http://192.168.1.42:8787/?t=<token>
     Storage  /Users/you/Library/Application Support/Watchpost
 ```
+
+Both links carry the access token, and the client removes it from the address bar as soon as
+it has stored it.
 
 Open the Mac link, then scan the QR code with your iPhone and choose **Share → Add to Home
 Screen**. That is the whole setup.

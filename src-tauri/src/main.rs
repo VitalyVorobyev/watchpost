@@ -98,6 +98,28 @@ fn spawn_server() -> std::io::Result<Child> {
     Ok(child)
 }
 
+/// The pairing token, read from the storage root the server writes it to.
+///
+/// The host screen is the one that *displays* the pairing QR, so it cannot acquire a token
+/// by scanning one. The shell reads the same mode-0600 file the server created; it runs as
+/// the same user on the same machine, so this grants it nothing it did not already have.
+fn pairing_token() -> Option<String> {
+    let home = std::env::var_os("HOME")?;
+    let path = PathBuf::from(home).join("Library/Application Support/Watchpost/token");
+    let token = std::fs::read_to_string(path).ok()?.trim().to_owned();
+    (!token.is_empty()).then_some(token)
+}
+
+/// The host layout URL, carrying the token when one exists. Tokens come from Python's
+/// `secrets.token_urlsafe`, which emits only `[A-Za-z0-9_-]`, so no percent-encoding is
+/// needed. The client strips the query from the address bar once it has stored the token.
+fn host_url() -> String {
+    match pairing_token() {
+        Some(token) => format!("http://127.0.0.1:{PORT}/host?t={token}"),
+        None => format!("http://127.0.0.1:{PORT}/host"),
+    }
+}
+
 /// Poll `/healthz` until the host answers. The window stays hidden until then so the user
 /// never sees a connection error that is really just startup.
 fn wait_until_ready() -> bool {
@@ -140,16 +162,13 @@ fn main() {
             let window = app.get_webview_window("main").expect("main window");
             let has_server = for_setup.lock().unwrap().is_some();
 
-            let url = if has_server && wait_until_ready() {
-                format!("http://127.0.0.1:{PORT}/host")
-            } else {
+            if !(has_server && wait_until_ready()) {
                 eprintln!("[watchpost] host did not become ready in time");
-                // Loading the URL anyway gives the user the client's own offline state,
-                // which explains the situation better than a blank window would.
-                format!("http://127.0.0.1:{PORT}/host")
-            };
+                // Navigating anyway gives the user the client's own offline state, which
+                // explains the situation better than a blank window would.
+            }
 
-            window.navigate(url.parse().expect("valid host url"))?;
+            window.navigate(host_url().parse().expect("valid host url"))?;
             window.show()?;
             Ok(())
         })
