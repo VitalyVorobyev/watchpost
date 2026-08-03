@@ -69,6 +69,13 @@ export function Preview({ state, showBadge = true }: { state: AppState | null; s
               <div className="spinner" aria-hidden="true" />
               <span>Connecting to the host…</span>
             </>
+          ) : state.capture.status === "off" ? (
+            // Ahead of the device states: with capture off the camera is genuinely
+            // released, and showing "disconnected" would read as a fault.
+            <>
+              <strong>Camera off</strong>
+              <span>The camera is released and nothing is being recorded.</span>
+            </>
           ) : state.camera.status === "disconnected" ? (
             <>
               <strong>Camera disconnected</strong>

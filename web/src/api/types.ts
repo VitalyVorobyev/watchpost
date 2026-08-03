@@ -1,6 +1,9 @@
 /** Mirrors the state snapshot in docs/design.md section 7. */
 
 export type CameraStatus = "unknown" | "ready" | "disconnected" | "error";
+/** Whether the user wants the camera open at all. Separate from CameraStatus, which
+ *  describes the device: "off" is an intention, not a fault. */
+export type CaptureStatus = "on" | "off";
 export type RecordingStatus = "idle" | "recording" | "finalizing" | "cooldown";
 export type StorageStatus = "ok" | "warning" | "full";
 export type HostStatus = "starting" | "running" | "degraded";
@@ -12,6 +15,7 @@ export type Connection = "connecting" | "live" | "reconnecting" | "offline";
 
 export interface AppState {
   host: { status: HostStatus; version: string; started_at: number; lan_url: string | null };
+  capture: { status: CaptureStatus };
   camera: {
     status: CameraStatus;
     name: string | null;

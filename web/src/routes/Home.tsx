@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, media } from "../api/client";
 import type { AppState, Connection, WatchEvent } from "../api/types";
+import { CameraToggle } from "../components/CameraToggle";
 import { Preview } from "../components/Preview";
 import {
   Banner,
@@ -87,7 +88,10 @@ export function Home({
         <Banner tone="warn">Connection lost — reconnecting automatically.</Banner>
       )}
 
-      {state.camera.status !== "ready" && (
+      {/* No banner for a switched-off camera. The preview overlay, the badge, the status
+          row and the toggle's own label already say so; the banner region is where the
+          user looks for *problems*, and this is not one. */}
+      {state.capture.status === "on" && state.camera.status !== "ready" && (
         <Banner tone="danger" title="Camera unavailable">
           {state.camera.message ??
             "The host is running but cannot open the camera. Nothing is being recorded."}
@@ -108,11 +112,15 @@ export function Home({
       <button
         className={`armbtn ${armed ? "armbtn--disarm" : "armbtn--arm"}`}
         onClick={toggle}
-        disabled={busy || state.camera.status !== "ready"}
+        // Not disabled when the camera is off: arming switches it on. Only a camera that
+        // is meant to be open but is not working blocks the control.
+        disabled={busy || (state.capture.status === "on" && state.camera.status !== "ready")}
       >
         {busy ? <span className="spinner" aria-hidden="true" /> : null}
         {armed ? "Disarm monitoring" : "Arm monitoring"}
       </button>
+
+      <CameraToggle state={state} onError={setError} />
 
       {error && <Banner tone="danger">{error}</Banner>}
 

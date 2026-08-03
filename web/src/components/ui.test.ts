@@ -5,6 +5,7 @@ import { activityLabel, cameraLabel, formatBytes, formatDuration } from "./ui";
 function state(overrides: Partial<AppState> = {}): AppState {
   return {
     host: { status: "running", version: "0.1.0", started_at: 0, lan_url: null },
+    capture: { status: "on" },
     camera: {
       status: "ready",
       name: "Cam",
@@ -53,6 +54,31 @@ describe("activityLabel", () => {
     );
     expect(result.text).toBe("Recording");
     expect(result.tone).toBe("danger");
+  });
+});
+
+describe("camera off", () => {
+  // A deliberate off state and a broken camera must not look alike: one is a choice the
+  // user made, the other is a failure they need to act on.
+  it("reads as a choice, not a fault", () => {
+    const off = state({ capture: { status: "off" } });
+    expect(activityLabel(off).text).toBe("Camera off");
+    expect(activityLabel(off).tone).not.toBe("danger");
+    expect(cameraLabel(off).text).toBe("Off");
+    expect(cameraLabel(off).tone).not.toBe("danger");
+  });
+
+  it("wins over stale device health, which nothing is observing", () => {
+    const off = state({
+      capture: { status: "off" },
+      camera: { ...state().camera, status: "disconnected" },
+    });
+    expect(cameraLabel(off).text).toBe("Off");
+  });
+
+  it("does not claim to be watching when armed state is stale", () => {
+    const off = state({ capture: { status: "off" }, monitoring: { armed: true, armed_at: 1 } });
+    expect(activityLabel(off).text).toBe("Camera off");
   });
 });
 

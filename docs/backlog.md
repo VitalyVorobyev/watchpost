@@ -50,6 +50,14 @@ all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraint
 - [x] Clip playback in Safari (proves Range → `206`)
 - [x] Add-to-Home-Screen
 
+## Done — Milestone G: camera and process controls
+
+- [x] `capture` intent axis in `state.py`, separate from `camera` health
+- [x] Switch the camera on/off from the phone and the host; persisted across restarts
+- [x] Arming implies capture on; switching capture off disarms
+- [x] Loopback-only `POST /command/shutdown`, with a confirmation step in the host layout
+- [x] Tauri shell exits when its server child does
+
 ## Done — Milestone E: Tauri shell
 
 - [x] `src-tauri` scaffold, Tauri v2
@@ -133,5 +141,10 @@ all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraint
 - ~~**Continuity Camera could not be re-selected.**~~ Closed. The iPhone leaves the AVFoundation
   device list when it goes away, and the picker offered only attached devices, so the entry
   vanished permanently. Seen cameras are remembered and stay selectable while absent.
+- **Disarmed still costs disk writes.** The ring is written whenever capture is on, about
+  0.5 MB/s — roughly 43 GB/day — regardless of armed state. Switching the camera off stops it
+  ([ADR-0010](adrs/0010-capture-intent-and-shutdown.md)), but a disarmed-and-on host still pays.
+  Worth revisiting whether the ring should pause while disarmed; the cost is losing pre-roll for
+  the first seconds after arming.
 - **Multiple clients on `/preview.mjpeg`.** Each connection gets its own JPEG encode. Fine for
   two clients; needs a shared encoder if it grows.

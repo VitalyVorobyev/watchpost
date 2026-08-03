@@ -55,6 +55,9 @@ class Settings(BaseModel):
 
     # Start monitoring as soon as the host comes up.
     arm_on_start: bool = False
+    # Whether the camera is open at all. Persisted: switching it off is a privacy choice,
+    # and a restart silently undoing it is the wrong direction to fail in.
+    capture_enabled: bool = True
 
     @property
     def ring_window_s(self) -> float:

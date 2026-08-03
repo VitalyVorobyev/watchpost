@@ -43,7 +43,14 @@ from .recorder import (
     probe_duration,
     wait_for_segments,
 )
-from .state import AppState, CameraStatus, RecordingStatus, StateService, StorageStatus
+from .state import (
+    AppState,
+    CameraStatus,
+    CaptureStatus,
+    RecordingStatus,
+    StateService,
+    StorageStatus,
+)
 from .store import Event, Store, new_event_id
 
 log = logging.getLogger(__name__)
@@ -98,6 +105,9 @@ class Application:
         # are exactly what pre-roll depends on.
         self._ring_floor: float | None = None
         self._caffeinate: subprocess.Popen | None = None
+        # Separate from _lock, which guards caffeinate: set_capture() calls disarm(),
+        # which takes _lock, so sharing one non-reentrant lock would deadlock.
+        self._capture_lock = threading.Lock()
         self._janitor_stop = threading.Event()
         self._janitor: threading.Thread | None = None
         self._lock = threading.Lock()
@@ -120,7 +130,11 @@ class Application:
         self.state.mutate(init)
         self._refresh_storage()
 
-        self.capture.start()
+        if self.config.settings.capture_enabled:
+            self.capture.start()
+        else:
+            self._publish_capture(CaptureStatus.OFF)
+            log.info("the camera is switched off; not opening it")
         self._janitor = threading.Thread(target=self._janitor_loop, name="janitor", daemon=True)
         self._janitor.start()
 
@@ -151,6 +165,9 @@ class Application:
     def arm(self) -> None:
         if self.state.armed:
             return
+        # Arming with the camera switched off would claim coverage that does not exist.
+        if not self.config.settings.capture_enabled:
+            self.set_capture(True)
 
         def apply(state: AppState) -> None:
             state.monitoring.armed = True
@@ -178,6 +195,47 @@ class Application:
         self.recorder.reset()
         self._stop_caffeinate()
         log.info("disarmed")
+
+    def set_capture(self, enabled: bool) -> None:
+        """Open or release the camera.
+
+        Distinct from arming, and the distinction matters. Disarming stops *recording* but
+        leaves ffmpeg running: the segment ring keeps churning to disk, the camera light
+        stays on, and the live preview stays available to anyone paired. Switching capture
+        off releases the device — the light goes out, another application can use it, and
+        the ring stops being written.
+
+        The choice is persisted, so a restart does not quietly re-open a camera the user
+        deliberately closed.
+        """
+        with self._capture_lock:
+            if enabled == self.config.settings.capture_enabled:
+                return
+            self.config.update({"capture_enabled": enabled})
+
+            if enabled:
+                self._publish_capture(CaptureStatus.ON)
+                self.capture.start()
+                log.info("camera switched on")
+                return
+
+            self.disarm()
+            # stop() joins the capture thread, so no late status callback can arrive after
+            # this and overwrite the off state with a stale device health.
+            self.capture.stop()
+            self.preview.clear()
+            self._publish_capture(CaptureStatus.OFF)
+            log.info("camera switched off")
+
+    def _publish_capture(self, status: CaptureStatus) -> None:
+        def apply(state: AppState) -> None:
+            state.capture.status = status
+            if status is CaptureStatus.OFF:
+                # Nothing is observing the device, so the last health we saw is stale.
+                state.camera.status = CameraStatus.UNKNOWN
+                state.camera.message = None
+
+        self.state.mutate(apply)
 
     def update_settings(self, patch: dict) -> Settings:
         previous = self.config.settings

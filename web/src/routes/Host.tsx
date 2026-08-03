@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import qrcode from "qrcode-generator";
 import { api } from "../api/client";
 import type { AppState, Connection, Pairing } from "../api/types";
+import { CameraToggle } from "../components/CameraToggle";
 import { Preview } from "../components/Preview";
 import {
   Banner,
@@ -43,9 +44,18 @@ function QrCode({ value }: { value: string }) {
   );
 }
 
+/** The host layout is only a route — a paired phone can open `/host` too. The Quit control
+ *  is therefore hidden off-loopback for tidiness, and *enforced* by the host, which answers
+ *  403 to a shutdown from anywhere but the Mac itself. */
+function isLoopback(): boolean {
+  return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(window.location.hostname);
+}
+
 export function Host({ state, connection }: { state: AppState | null; connection: Connection }) {
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmQuit, setConfirmQuit] = useState(false);
 
   useEffect(() => {
     api.pairing().then(setPairing).catch(() => undefined);
@@ -75,10 +85,12 @@ export function Host({ state, connection }: { state: AppState | null; connection
               <button
                 className={`armbtn ${state.monitoring.armed ? "armbtn--disarm" : "armbtn--arm"}`}
                 onClick={toggle}
-                disabled={busy || state.camera.status !== "ready"}
+                disabled={busy || (state.capture.status === "on" && state.camera.status !== "ready")}
               >
                 {state.monitoring.armed ? "Disarm monitoring" : "Arm monitoring"}
               </button>
+              <CameraToggle state={state} onError={setError} />
+              {error && <Banner tone="danger">{error}</Banner>}
               {state.monitoring.armed && (
                 <Banner tone="info" title="Keep the lid open">
                   Watchpost prevents display and idle sleep while armed, but closing the lid
@@ -145,6 +157,43 @@ export function Host({ state, connection }: { state: AppState | null; connection
               </Card>
             </div>
           </div>
+
+          {isLoopback() && (
+            <Card title="Stop Watchpost">
+              {confirmQuit ? (
+                <div className="stack stack--tight">
+                  <Banner tone="warn">
+                    Monitoring stops immediately and the phone loses its connection. Starting it
+                    again means coming back to this Mac.
+                  </Banner>
+                  <div className="row">
+                    <button
+                      className="btn btn--danger"
+                      onClick={() => {
+                        // The host dies mid-response, so a network error here is success.
+                        void api.shutdown().catch(() => undefined);
+                      }}
+                    >
+                      Shut down the host
+                    </button>
+                    <button className="btn btn--ghost" onClick={() => setConfirmQuit(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="stack stack--tight">
+                  <button className="btn" onClick={() => setConfirmQuit(true)}>
+                    Shut down the host
+                  </button>
+                  <span className="field__hint">
+                    Only available on this Mac. The host refuses a shutdown from any other
+                    device, so a phone can never lock itself out.
+                  </span>
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card title="Recent problems">
             {state.errors.length === 0 ? (

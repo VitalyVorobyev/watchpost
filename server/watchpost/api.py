@@ -10,6 +10,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
+import signal
 from collections.abc import AsyncIterator
 from pathlib import Path
 from urllib.parse import quote
@@ -101,6 +103,36 @@ def create_app(application: Application, web_dist: Path | None = None) -> FastAP
     def disarm() -> dict:
         application.disarm()
         return application.state.snapshot()
+
+    @router.post("/command/camera/{action}")
+    def set_camera(action: str) -> dict:
+        """Open or release the camera. Not the same as arming — see `Application.set_capture`."""
+        if action not in ("on", "off"):
+            raise HTTPException(status_code=404, detail="expected 'on' or 'off'")
+        application.set_capture(action == "on")
+        return application.state.snapshot()
+
+    @router.post("/command/shutdown")
+    async def shutdown(request: Request) -> dict:
+        """Stop the host process.
+
+        Restricted to loopback on purpose. A device that can shut the host down can lock
+        itself out of it — from the phone there would be no way back short of walking to
+        the Mac. `/host` is only a route, reachable from any paired device, so hiding the
+        control in the client is cosmetic; this check is what actually enforces it.
+        """
+        client = request.client.host if request.client else None
+        if client not in ("127.0.0.1", "::1"):
+            raise HTTPException(
+                status_code=403, detail="Watchpost can only be shut down from the Mac itself"
+            )
+
+        # Reply first: SIGTERM reaches uvicorn's own handler, which unwinds the lifespan
+        # and so calls Application.shutdown() — the same clean path as Ctrl-C.
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.25, lambda: os.kill(os.getpid(), signal.SIGTERM))
+        log.info("shutdown requested from %s", client)
+        return {"ok": True}
 
     # -- events ----------------------------------------------------------
 

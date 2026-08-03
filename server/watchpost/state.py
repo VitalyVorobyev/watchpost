@@ -14,6 +14,18 @@ from enum import StrEnum
 from typing import Any
 
 
+class CaptureStatus(StrEnum):
+    """Whether the user wants the camera open at all.
+
+    Deliberately separate from :class:`CameraStatus`, which describes the *device*. "Off"
+    is an intention, not a fault, and an interface that cannot tell the two apart will
+    report a deliberate privacy choice as a failure.
+    """
+
+    ON = "on"
+    OFF = "off"
+
+
 class CameraStatus(StrEnum):
     UNKNOWN = "unknown"
     READY = "ready"
@@ -59,6 +71,11 @@ class CameraState:
 
 
 @dataclass
+class CaptureState:
+    status: CaptureStatus = CaptureStatus.ON
+
+
+@dataclass
 class MonitoringState:
     armed: bool = False
     armed_at: float | None = None
@@ -96,6 +113,7 @@ class HostState:
 @dataclass
 class AppState:
     host: HostState = field(default_factory=HostState)
+    capture: CaptureState = field(default_factory=CaptureState)
     camera: CameraState = field(default_factory=CameraState)
     monitoring: MonitoringState = field(default_factory=MonitoringState)
     recording: RecordingState = field(default_factory=RecordingState)

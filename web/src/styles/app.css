@@ -68,6 +68,11 @@ a {
   gap: var(--s4);
 }
 
+/* For a control and the sentence that explains it: they read as one unit. */
+.stack--tight {
+  gap: var(--s2);
+}
+
 .row {
   display: flex;
   align-items: center;

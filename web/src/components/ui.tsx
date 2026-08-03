@@ -116,6 +116,9 @@ export function connectionLabel(connection: Connection): { tone: Tone; text: str
 }
 
 export function cameraLabel(state: AppState): { tone: Tone; text: string } {
+  // Checked before device health: with capture off nothing is observing the device, so
+  // whatever health was last seen is stale, and "off" is a choice rather than a fault.
+  if (state.capture.status === "off") return { tone: "idle", text: "Off" };
   switch (state.camera.status) {
     case "ready":
       return { tone: "ok", text: "Ready" };
@@ -133,6 +136,7 @@ export function activityLabel(state: AppState): { tone: Tone; text: string } {
   if (state.recording.status === "recording") return { tone: "danger", text: "Recording" };
   if (state.recording.status === "finalizing") return { tone: "warn", text: "Saving clip" };
   if (state.recording.status === "cooldown") return { tone: "idle", text: "Cooling down" };
+  if (state.capture.status === "off") return { tone: "idle", text: "Camera off" };
   if (!state.monitoring.armed) return { tone: "idle", text: "Disarmed" };
   if (state.camera.status !== "ready") return { tone: "danger", text: "Armed, no camera" };
   return { tone: "ok", text: "Armed, watching" };

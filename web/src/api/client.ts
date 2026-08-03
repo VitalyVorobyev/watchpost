@@ -52,6 +52,10 @@ export const api = {
   state: () => request<AppState>("/state"),
   arm: () => request<AppState>("/command/arm", { method: "POST" }),
   disarm: () => request<AppState>("/command/disarm", { method: "POST" }),
+  cameraOn: () => request<AppState>("/command/camera/on", { method: "POST" }),
+  cameraOff: () => request<AppState>("/command/camera/off", { method: "POST" }),
+  /** Loopback only — the host rejects this with 403 from anywhere else. */
+  shutdown: () => request<{ ok: boolean }>("/command/shutdown", { method: "POST" }),
 
   events: (limit = 50, before?: number) =>
     request<{ events: WatchEvent[] }>(

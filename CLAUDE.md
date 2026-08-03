@@ -86,6 +86,11 @@ work. Tick completed backlog items and update the matching `roadmap.md` row.
 
 - The server must work when launched from a terminal. Tauri supervises it; it never contains it.
 - One authoritative state model in `state.py`. Interfaces observe it; they never infer state.
+- `capture` (intent) and `camera` (device health) are separate axes. Check `capture` first
+  when rendering, or a deliberately switched-off camera reports as a fault
+  ([ADR-0010](docs/adrs/0010-capture-intent-and-shutdown.md)).
+- Shutdown is loopback-only. Do not expose it to the phone: a device that can stop the host
+  can lock itself out of it.
 - Keep capture, detection, recording, storage, and API concerns separate.
 - Keep the detector replaceable — the recorder consumes `Detection`, nothing more
   ([ADR-0007](docs/adrs/0007-detector-interface.md)).

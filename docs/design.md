@@ -110,6 +110,7 @@ The host owns one authoritative state model. Every interface observes it; no int
 state independently.
 
 ```
+capture:     on | off            (does the user want the camera open at all)
 camera:      unknown | ready | disconnected | error
 monitoring:  disarmed | armed
 recording:   idle | recording | finalizing | cooldown
@@ -122,6 +123,12 @@ Client-side only:
 ```
 connection:  connecting | live | reconnecting | offline
 ```
+
+`capture` is intent; `camera` is device health. Keeping them apart is what lets an interface
+say "off" rather than "disconnected" when the user switched the camera off deliberately — and
+they behave differently: **disarming stops recording but leaves `ffmpeg` running**, so the
+segment ring keeps churning to disk and the preview stays live. Switching capture off releases
+the device. Arming implies `capture: on`; switching capture off disarms.
 
 Composite situations the UI must distinguish — the docs call these out because they look alike
 and are not:
@@ -301,6 +308,8 @@ Base path `/api/v1`. All endpoints require the token except `/healthz`.
 | `GET` | `/state` | authoritative state snapshot |
 | `GET` | `/state/stream` | SSE stream of state changes and new events |
 | `POST` | `/command/arm` · `/command/disarm` | monitoring control |
+| `POST` | `/command/camera/on`, `/command/camera/off` | open or release the camera |
+| `POST` | `/command/shutdown` | stop the host; **loopback only**, `403` elsewhere |
 | `GET` | `/events?limit&before` | reverse-chronological event page |
 | `GET` | `/events/{id}` | one event |
 | `POST` | `/events/{id}/viewed` | mark viewed |

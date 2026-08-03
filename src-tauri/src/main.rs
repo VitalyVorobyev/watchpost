@@ -170,6 +170,30 @@ fn main() {
 
             window.navigate(host_url().parse().expect("valid host url"))?;
             window.show()?;
+
+            // The inverse of the Destroyed handler below. Without this, shutting the host
+            // down from its own UI would leave a live window staring at a dead server.
+            let watched = Arc::clone(&for_setup);
+            let handle = app.handle().clone();
+            thread::spawn(move || {
+                loop {
+                    thread::sleep(Duration::from_millis(500));
+                    let exited = match watched.lock() {
+                        Ok(mut guard) => match guard.as_mut() {
+                            // try_wait reaps without blocking, so the lock is never held
+                            // while the window-close path wants it.
+                            Some(child) => matches!(child.try_wait(), Ok(Some(_)) | Err(_)),
+                            None => break,
+                        },
+                        Err(_) => break,
+                    };
+                    if exited {
+                        println!("[watchpost] the host exited; closing the window");
+                        handle.exit(0);
+                        break;
+                    }
+                }
+            });
             Ok(())
         })
         .on_window_event(move |_window, event| {
