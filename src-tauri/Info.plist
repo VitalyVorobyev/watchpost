@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated Info.plist by tauri-build on macOS.
+
+  NSCameraUsageDescription is not optional. macOS grants camera access to the *responsible
+  process*, which becomes this app once it spawns the capture pipeline. Without this key
+  the request is denied outright, with no prompt and no error the user can act on.
+  See docs/adrs/0005-python-host-tauri-supervisor.md.
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Watchpost uses the camera you select to detect motion and record event clips. Video stays on this Mac.</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+  </dict>
+</plist>
