@@ -260,7 +260,19 @@ def create_app(application: Application, web_dist: Path | None = None) -> FastAP
         return application.config.settings.model_dump()
 
     @router.put("/settings")
-    def put_settings(payload: dict) -> dict:
+    def put_settings(payload: dict, request: Request) -> dict:
+        # Encryption is a security policy, not a preference, and turning it off from a
+        # phone would downgrade every device at once. Same reasoning as /command/shutdown:
+        # a change of this weight is made at the machine. Everything else is fair game
+        # from anywhere, because the caller already holds the token.
+        if "tls_enabled" in payload and bool(payload["tls_enabled"]) != (
+            application.config.settings.tls_enabled
+        ):
+            client = request.client.host if request.client else None
+            if client not in ("127.0.0.1", "::1"):
+                raise HTTPException(
+                    status_code=403, detail="Encryption can only be changed from the Mac itself"
+                )
         try:
             return application.update_settings(payload).model_dump()
         except ValueError as exc:

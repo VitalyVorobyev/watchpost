@@ -10,6 +10,7 @@ import qrcode from "qrcode-generator";
 import { api } from "../api/client";
 import type { AppState, Connection, Pairing } from "../api/types";
 import { CameraToggle } from "../components/CameraToggle";
+import { EncryptionCard } from "../components/EncryptionCard";
 import { Preview } from "../components/Preview";
 import {
   Banner,
@@ -56,8 +57,6 @@ export function Host({ state, connection }: { state: AppState | null; connection
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
-  const [enabling, setEnabling] = useState(false);
-  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     api.pairing().then(setPairing).catch(() => undefined);
@@ -186,44 +185,7 @@ export function Host({ state, connection }: { state: AppState | null; connection
                 )}
               </Card>
 
-              {pairing && !pairing.tls && (
-                <Card title="Encryption">
-                  <div className="stack stack--tight">
-                    <Banner tone="warn">
-                      Traffic is unencrypted. On a WPA2 network anyone who knows the Wi-Fi
-                      password can read the token and watch the video.
-                    </Banner>
-                    <button
-                      className="btn"
-                      disabled={enabling}
-                      onClick={() => {
-                        setEnabling(true);
-                        void api
-                          .updateSettings({ tls_enabled: true })
-                          .then(() => setEnabled(true))
-                          .catch((exc) =>
-                            setError(exc instanceof Error ? exc.message : "Could not enable"),
-                          )
-                          .finally(() => setEnabling(false));
-                      }}
-                    >
-                      Turn encryption on
-                    </button>
-                    {enabled ? (
-                      <Banner tone="info" title="Restart Watchpost to apply">
-                        The certificate is created at startup, so the host has to be restarted.
-                        Every device then needs to trust it once — a QR code for that appears
-                        here afterwards.
-                      </Banner>
-                    ) : (
-                      <span className="field__hint">
-                        Watchpost issues its own certificate. Each device trusts it once, in two
-                        steps that the setup page explains.
-                      </span>
-                    )}
-                  </div>
-                </Card>
-              )}
+              {pairing && isLoopback() && <EncryptionCard pairing={pairing} />}
             </div>
           </div>
 

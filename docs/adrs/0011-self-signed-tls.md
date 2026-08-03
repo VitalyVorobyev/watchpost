@@ -68,8 +68,14 @@ gets its pairing URL by scanning a **second** QR code from the Mac, over HTTPS.
 
 `tls_enabled` defaults to `false`. Turning it on requires installing and trusting a CA on every
 device, so an upgrade must not do it silently and strand a working phone. The host layout offers
-it with the consequences stated, and it takes effect on the next start because the certificate is
-loaded when the socket is created.
+it in both directions with the consequences stated, and it takes effect on the next start because
+the certificate is loaded when the socket is created.
+
+Changing it is **loopback only**, enforced on `PUT /settings` rather than by hiding the control:
+`/host` is just a route and a paired phone can open it. Encryption is a security policy affecting
+every device at once, so it is set at the machine — the same reasoning as
+`/command/shutdown` in [ADR-0010](0010-capture-intent-and-shutdown.md). Every other setting stays
+changeable from anywhere, because the caller already holds the token.
 
 ## Consequences
 

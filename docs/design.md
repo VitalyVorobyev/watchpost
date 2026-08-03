@@ -320,7 +320,7 @@ Base path `/api/v1`. All endpoints require the token except `/healthz`.
 | `GET` | `/snapshot.jpg` | single preview frame (polling fallback) |
 | `GET` | `/cameras` | selectable devices: name, UID, `selected`, `present` |
 | `PUT` | `/camera` | select a camera, attached or not |
-| `GET` `PUT` | `/settings` | read and update settings |
+| `GET` `PUT` | `/settings` | read and update settings; changing `tls_enabled` is **loopback only** |
 | `GET` | `/healthz` | liveness, unauthenticated |
 | `GET` | `/manifest.webmanifest` | web manifest, unauthenticated; `start_url` carries a verified `?t=` |
 
