@@ -85,3 +85,21 @@ export interface Pairing {
   /** Plaintext page where a device installs the CA. Null when TLS is off. */
   trust_url: string | null;
 }
+
+/** Backfill fields a host older than this client does not send.
+
+The host serves the client from `web/dist`, so during development the two drift apart
+whenever the client is rebuilt without restarting the server. Reading a field the old host
+has never heard of throws during render, and React unmounts the tree — a blank page, with
+the real cause only visible in the console. Degrading to a sensible default is always
+better than showing nothing.
+*/
+type HostSnapshot = Omit<AppState, "capture"> & Partial<Pick<AppState, "capture">>;
+
+export function adoptState(raw: HostSnapshot): AppState {
+  return {
+    ...raw,
+    // Predates the capture axis (ADR-0010). Such a host always had the camera open.
+    capture: raw.capture ?? { status: "on" },
+  };
+}

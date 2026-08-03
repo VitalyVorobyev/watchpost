@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { media } from "./client";
 import { bootstrapToken, getToken } from "./token";
+import { adoptState } from "./types";
 import type { AppState, Connection, WatchEvent } from "./types";
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000];
@@ -52,7 +53,7 @@ export function useAppState(): LiveState {
       try {
         const message = JSON.parse(event.data);
         if (message.type === "state") {
-          setState(message.state as AppState);
+          setState(adoptState(message.state as AppState));
           setConnection("live");
         } else if (message.type === "event") {
           setLatestEvent(message.event as WatchEvent);

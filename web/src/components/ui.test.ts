@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { adoptState } from "../api/types";
 import type { AppState } from "../api/types";
 import { activityLabel, cameraLabel, formatBytes, formatDuration } from "./ui";
 
@@ -104,5 +105,21 @@ describe("formatDuration", () => {
   it("splits minutes from seconds", () => {
     expect(formatDuration(24)).toBe("24s");
     expect(formatDuration(90)).toBe("1m 30s");
+  });
+});
+
+describe("adoptState", () => {
+  // A blank page is the worst possible failure: the cause is only in a console the user
+  // will never open. This happened for real when a rebuilt client met a host that had been
+  // running since before the capture axis existed.
+  it("supplies capture for a host that predates it", () => {
+    const { capture, ...older } = state();
+    void capture;
+    expect(adoptState(older).capture).toEqual({ status: "on" });
+  });
+
+  it("leaves a current snapshot untouched", () => {
+    const current = state({ capture: { status: "off" } });
+    expect(adoptState(current).capture).toEqual({ status: "off" });
   });
 });
