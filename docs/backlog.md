@@ -148,5 +148,12 @@ all three are fixed and recorded in [ADR-0009](adrs/0009-ios-platform-constraint
   ([ADR-0010](adrs/0010-capture-intent-and-shutdown.md)), but a disarmed-and-on host still pays.
   Worth revisiting whether the ring should pause while disarmed; the cost is losing pre-roll for
   the first seconds after arming.
+- ~~**A second instance stole the camera and the app vanished.**~~ Closed. uvicorn runs the ASGI
+  lifespan before it binds, so a duplicate launch opened the camera, hit `EADDRINUSE`, and exited
+  — disturbing the healthy instance. The CLI now probes the port before anything else and exits
+  with an instruction. The Tauri shell used to quit instantly when its child died, which turned
+  that conflict into a window that never appeared; it now stays up, leaves the bundled client to
+  show its offline state, and only arms the exit-with-child watcher once the host has served a
+  request.
 - **Multiple clients on `/preview.mjpeg`.** Each connection gets its own JPEG encode. Fine for
   two clients; needs a shared encoder if it grows.

@@ -7,7 +7,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -148,6 +148,46 @@ fn host_url() -> String {
     }
 }
 
+/// Whether macOS trusts our own CA.
+///
+/// `WKWebView` uses the system trust store, not the CA file the host was configured with,
+/// so an untrusted CA means the window loads *nothing* — no error page, no console, just an
+/// empty window. Worth one subprocess to be able to say so out loud.
+fn ca_trusted(ca: &Path) -> bool {
+    Command::new("security")
+        .arg("verify-cert")
+        .arg("-c")
+        .arg(ca)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Warn, loudly and with the exact command, when TLS is on but the certificate is not
+/// trusted here. Returns false when the window is expected to come up empty.
+fn check_local_trust() -> bool {
+    if !tls_enabled() {
+        return true;
+    }
+    let Some(ca) = storage_root().map(|root| root.join("tls/ca.crt")) else {
+        return true;
+    };
+    if !ca.is_file() || ca_trusted(&ca) {
+        return true;
+    }
+    eprintln!("[watchpost] ---------------------------------------------------------------");
+    eprintln!("[watchpost] Encryption is on, but this Mac does not trust Watchpost's CA.");
+    eprintln!("[watchpost] The window will stay blank until it does. Run:");
+    eprintln!(
+        "[watchpost]     sudo security add-trusted-cert -d -r trustRoot \\\n[watchpost]       -k /Library/Keychains/System.keychain {}",
+        ca.display()
+    );
+    eprintln!("[watchpost] ---------------------------------------------------------------");
+    false
+}
+
 /// Poll `/healthz` until the host answers. The window stays hidden until then so the user
 /// never sees a connection error that is really just startup.
 fn wait_until_ready() -> bool {
@@ -194,20 +234,32 @@ fn main() {
             let window = app.get_webview_window("main").expect("main window");
             let has_server = for_setup.lock().unwrap().is_some();
 
-            if !(has_server && wait_until_ready()) {
-                eprintln!("[watchpost] host did not become ready in time");
-                // Navigating anyway gives the user the client's own offline state, which
-                // explains the situation better than a blank window would.
+            let ready = has_server && wait_until_ready();
+            if ready {
+                check_local_trust();
+                window.navigate(host_url().parse().expect("valid host url"))?;
+            } else {
+                eprintln!("[watchpost] the host did not start; see the output above.");
+                eprintln!("[watchpost] If another Watchpost is already running, stop it first:");
+                eprintln!("[watchpost]     pkill -f \"watchpost serve\"");
+                // Deliberately *not* navigating. The bundled client renders its own offline
+                // state, which is something the user can read; a dead URL renders nothing.
             }
-
-            window.navigate(host_url().parse().expect("valid host url"))?;
             window.show()?;
 
             // The inverse of the Destroyed handler below. Without this, shutting the host
             // down from its own UI would leave a live window staring at a dead server.
+            //
+            // Only armed once the host has actually served a request. A server that never
+            // started is already dead, and exiting on that would close the window before
+            // the user can read why — which is exactly how a port conflict became an app
+            // that appeared to do nothing at all.
             let watched = Arc::clone(&for_setup);
             let handle = app.handle().clone();
             thread::spawn(move || {
+                if !ready {
+                    return;
+                }
                 loop {
                     thread::sleep(Duration::from_millis(500));
                     let exited = match watched.lock() {

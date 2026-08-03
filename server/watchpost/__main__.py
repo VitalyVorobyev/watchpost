@@ -32,6 +32,23 @@ def _default_web_dist() -> Path | None:
     return candidate if candidate.exists() else None
 
 
+def _port_available(host: str, port: int) -> bool:
+    """Whether the port can be bound, checked before anything else happens.
+
+    uvicorn runs the ASGI lifespan *before* it binds its socket, so a second instance
+    started by mistake opens the camera, discovers the port is taken, and exits — briefly
+    stealing the device from the healthy instance that already owns it. Failing here costs
+    one syscall and avoids disturbing anything.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(("" if host == "0.0.0.0" else host, port))  # noqa: S104
+        except OSError:
+            return False
+    return True
+
+
 def _configure_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -76,6 +93,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     _configure_logging(args.verbose)
+
+    if not _port_available(args.host, args.port):
+        print()
+        print(f"  Port {args.port} is already in use — Watchpost is probably already running.")
+        print("  Stop it first:")
+        print('      pkill -f "watchpost serve"')
+        print()
+        return 1
+
     paths = Paths(args.root)
     application = Application(paths, port=args.port)
     ip = lan_ip()

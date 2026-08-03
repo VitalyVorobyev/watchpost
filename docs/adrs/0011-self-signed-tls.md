@@ -76,8 +76,11 @@ loaded when the socket is created.
 - Setup gains a one-time, per-device step, and it is a fiddly one. The enrolment page exists
   because "install a certificate profile" is not something a user should be left to figure out.
   This is the cost of not depending on a public CA, and it is charged once per device.
-- The Mac's own window also needs the CA in the login keychain and marked *Always Trust*, or
-  `WKWebView` refuses to load the host layout. The enrolment page says so.
+- The Mac's own window needs the CA trusted in a *keychain*, not merely present on disk:
+  `WKWebView` consults the system trust store and not the certificate the host was configured
+  with. An untrusted CA produces an empty window with no error page and nothing in any log, so
+  the shell runs `security verify-cert` at startup and prints the exact command when it fails.
+  This is the single most confusing failure mode of this decision.
 - The Tauri shell reads `tls_enabled` from `config.json` to pick its scheme, and verifies the
   health probe against the CA rather than passing `-k`. A wrong certificate should fail the
   probe, because it is exactly what would break the window.
