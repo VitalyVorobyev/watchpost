@@ -9,37 +9,37 @@ top of their section. When an item is done, tick it here *and* update the matchi
 
 ---
 
-## Now — Milestone B: server core
+## Done — Milestone B: server core
 
-- [ ] `paths.py` — storage root under `~/Library/Application Support/Watchpost/`, directory bootstrap
-- [ ] `config.py` — settings model, JSON persistence, validation against documented bounds
-- [ ] `auth.py` — token generation at mode 0600, constant-time verification, bearer + `?t=`
-- [ ] `camera.py` — enumerate via AVFoundation, filter virtual inputs, resolve `(name, uid)` → index
-- [ ] `capture.py` — ffmpeg supervisor, dual output, backoff restart, camera health publishing
-- [ ] `detect.py` — `Detector` protocol + `MotionDetector`
-- [ ] `store.py` — SQLite schema, event CRUD, retention on three bounds, ring janitor
-- [ ] `recorder.py` — event state machine, segment selection, concat, thumbnail
-- [ ] `state.py` — authoritative `AppState` + change bus for SSE fan-out
-- [ ] `preview.py` — latest-frame JPEG, MJPEG multipart generator
-- [ ] `api.py` — REST + SSE + **range-aware clip responder**
-- [ ] `__main__.py` — `watchpost serve --host --port`
-- [ ] `caffeinate` lifecycle tied to armed state
+- [x] `paths.py` — storage root under `~/Library/Application Support/Watchpost/`, directory bootstrap
+- [x] `config.py` — settings model, JSON persistence, validation against documented bounds
+- [x] `auth.py` — token generation at mode 0600, constant-time verification, bearer + `?t=`
+- [x] `camera.py` — enumerate via AVFoundation, filter virtual inputs, resolve `(name, uid)` → index
+- [x] `capture.py` — ffmpeg supervisor, dual output, backoff restart, camera health publishing
+- [x] `detect.py` — `Detector` protocol + `MotionDetector`
+- [x] `store.py` — SQLite schema, event CRUD, retention on three bounds, ring janitor
+- [x] `recorder.py` — event state machine, segment selection, concat, thumbnail
+- [x] `state.py` — authoritative `AppState` + change bus for SSE fan-out
+- [x] `preview.py` — latest-frame JPEG, MJPEG multipart generator
+- [x] `api.py` — REST + SSE + **range-aware clip responder**
+- [x] `__main__.py` — `watchpost serve --host --port`
+- [x] `caffeinate` lifecycle tied to armed state
 
-## Next — Milestone C: web client
+## Done — Milestone C: web client
 
-- [ ] Vite + React 19 + TS scaffold, `bun` as package manager
-- [ ] `styles/tokens.css` — colour, spacing, radius, type; light and dark
-- [ ] Typed API client + `useAppState` SSE hook with backoff reconnection
-- [ ] Token bootstrap from `?t=`, persist to `localStorage`, strip from the URL
-- [ ] Home: status, arm/disarm, preview, latest event, storage summary
-- [ ] Events list: thumbnails, grouping by day, viewed state, empty state
-- [ ] Event detail: playback, metadata, download, delete with confirmation
-- [ ] Settings: sensitivity, pre/post-roll, cooldown, retention, camera selection
-- [ ] Host layout: preview, pairing QR, LAN address, storage, errors, lid-open notice
-- [ ] Offline / reconnecting / loading / empty / error states throughout
-- [ ] `manifest.webmanifest` + icons for Add-to-Home-Screen
+- [x] Vite + React 19 + TS scaffold, `bun` as package manager
+- [x] `styles/tokens.css` — colour, spacing, radius, type; light and dark
+- [x] Typed API client + `useAppState` SSE hook with backoff reconnection
+- [x] Token bootstrap from `?t=`, persist to `localStorage`, strip from the URL
+- [x] Home: status, arm/disarm, preview, latest event, storage summary
+- [x] Events list: thumbnails, grouping by day, viewed state, empty state
+- [x] Event detail: playback, metadata, download, delete with confirmation
+- [x] Settings: sensitivity, pre/post-roll, cooldown, retention, camera selection
+- [x] Host layout: preview, pairing QR, LAN address, storage, errors, lid-open notice
+- [x] Offline / reconnecting / loading / empty / error states throughout
+- [x] `manifest.webmanifest` + icons for Add-to-Home-Screen
 
-## Next — Milestone D: iPhone verification
+## Now — Milestone D: iPhone verification
 
 - [ ] Bind `0.0.0.0`, confirm reachability from the phone
 - [ ] QR pairing round trip
@@ -47,20 +47,35 @@ top of their section. When an item is done, tick it here *and* update the matchi
 - [ ] Clip playback in Safari (proves Range → `206`)
 - [ ] Add-to-Home-Screen
 
-## Next — Milestone E: Tauri shell
+## Done — Milestone E: Tauri shell
 
-- [ ] `src-tauri` scaffold, Tauri v2
-- [ ] Spawn and supervise the server child; kill on exit
-- [ ] `Info.plist` with `NSCameraUsageDescription`
-- [ ] Window at `127.0.0.1:8787/host`; verify the camera prompt appears
+- [x] `src-tauri` scaffold, Tauri v2
+- [x] Spawn and supervise the server child; kill on exit
+- [x] `Info.plist` with `NSCameraUsageDescription`
+- [x] Window at `127.0.0.1:8787/host`; verify the camera prompt appears
 
-## Next — Milestone F: tests
+## Done — Milestone F: tests
 
-- [ ] `MotionDetector`: static scene, moving block, illumination ramp, warm-up
-- [ ] Event state machine: trigger, extend, post-roll expiry, max-duration cap, cooldown
-- [ ] Segment selection: window arithmetic against a synthetic ring directory
-- [ ] Retention: each of the three bounds independently and combined
-- [ ] Range responder: full, partial, suffix, and unsatisfiable ranges
+- [x] `MotionDetector`: static scene, moving block, illumination ramp, warm-up
+- [x] Event state machine: trigger, extend, post-roll expiry, max-duration cap, cooldown
+- [x] Segment selection: window arithmetic against a synthetic ring directory
+- [x] Retention: each of the three bounds independently and combined
+- [x] Range responder: full, partial, suffix, and unsatisfiable ranges
+
+---
+
+## Known device behaviour worth remembering
+
+- **UVC cameras want exact rational frame rates.** The StreamCam advertises `30.000030` fps and
+  rejects a request for `30` with "Configuration of video device failed", after which capture
+  silently produces nothing. `camera.resolve_mode()` snaps to an advertised mode and echoes the
+  rate back verbatim.
+- **Advertised rates are not promises.** The same camera advertises 1280x720@30 but delivers
+  about 10 fps uncompressed, because raw 720p30 exceeds the USB bandwidth available to it.
+  640x480 sustains 30. Clip assembly is unaffected because keyframes are forced on a time
+  interval, not a frame count.
+- **`-pixel_format` is best left unset.** The supported set varies per device and connection
+  speed; pinning `nv12` broke the StreamCam while working on the built-in camera.
 
 ---
 
@@ -76,6 +91,8 @@ top of their section. When an item is done, tick it here *and* update the matchi
 - [ ] First-run configuration flow
 - [ ] Clip export and share sheet
 - [ ] Per-device tokens with individual revocation
+- [ ] Release workflow: build and publish a signed `.dmg` on tag
+- [ ] Measure and report the *achieved* frame rate, not just the negotiated one
 
 ## Phase 3 — deferred
 
@@ -96,8 +113,9 @@ top of their section. When an item is done, tick it here *and* update the matchi
   have run against a real scene for a day. Expect to change them.
 - **Timezone rendering.** Timestamps are stored UTC and rendered in the browser's zone. A phone
   in a different timezone from the Mac shows shifted times. Probably correct, but undecided.
-- **Ring janitor vs. long events.** An event longer than the ring's retention window would lose
-  its own tail. `max_clip_s` (120 s) is well under the ring window, but the interaction is not
-  yet enforced by an assertion.
+- ~~**Ring janitor vs. long events.**~~ Closed. An in-flight event now pins a floor on ring
+  pruning (`Application._ring_floor`) for its whole life, and `build_clip` logs a warning when
+  the assembled span is shorter than requested. This bit for real during development when
+  settings were changed mid-event, producing a 2-second clip for a 58-second window.
 - **Multiple clients on `/preview.mjpeg`.** Each connection gets its own JPEG encode. Fine for
   two clients; needs a shared encoder if it grows.

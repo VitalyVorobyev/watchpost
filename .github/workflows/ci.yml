@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a PR makes the previous run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  server:
+    name: Server (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: server/pyproject.toml
+
+      - name: Sync dependencies
+        working-directory: server
+        run: uv sync --all-extras --dev --python ${{ matrix.python }}
+
+      - name: Lint
+        working-directory: server
+        run: uv run ruff check --output-format=github .
+
+      - name: Check formatting
+        working-directory: server
+        run: uv run ruff format --check .
+
+      # The pure logic — detector, event state machine, segment selection, retention,
+      # Range parsing — runs without a camera, which is why it can run here at all.
+      - name: Test
+        working-directory: server
+        run: uv run pytest -q
+
+  web:
+    name: Web client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: web
+        run: bun run typecheck
+
+      - name: Test
+        working-directory: web
+        run: bun run test
+
+      - name: Build
+        working-directory: web
+        run: bun run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 7
+
+  shell:
+    name: Desktop shell
+    # The shell is macOS-only in practice: it drives AVFoundation capture and depends on
+    # macOS camera permissions. Building it elsewhere would test nothing real.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # tauri-build reads the frontend dist at compile time, so it must exist.
+      - name: Stage a frontend bundle
+        run: mkdir -p web/dist && echo '<!doctype html><title>ci</title>' > web/dist/index.html
+
+      - name: Check formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        working-directory: src-tauri
+        run: cargo build --locked
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit Rust dependencies
+        working-directory: src-tauri
+        run: cargo audit
+
+      - uses: oven-sh/setup-bun@v2
+      - name: Audit npm dependencies
+        working-directory: web
+        run: bun audit --audit-level=high || true
+
+  integration:
+    name: End-to-end (macOS, no camera)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: server/pyproject.toml
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install ffmpeg
+        run: brew install ffmpeg
+
+      - name: Build the web client
+        working-directory: web
+        run: bun install --frozen-lockfile && bun run build
+
+      - name: Start the host
+        working-directory: server
+        env:
+          WATCHPOST_ROOT: ${{ runner.temp }}/watchpost
+        run: |
+          uv sync
+          uv run watchpost serve --host 127.0.0.1 --port 8787 &
+          for _ in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:8787/healthz && break
+            sleep 1
+          done
+
+      # A CI runner has no camera, so this asserts what does not depend on one: the host
+      # starts, serves the built client, and enforces authentication.
+      - name: Verify the API contract
+        env:
+          WATCHPOST_ROOT: ${{ runner.temp }}/watchpost
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:8787/healthz | grep -q '"ok":true'
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/api/v1/state)
+          test "$code" = "401" || { echo "unauthenticated request was not rejected: $code"; exit 1; }
+
+          token=$(cat "$WATCHPOST_ROOT/token")
+          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:8787/api/v1/state \
+            | grep -q '"host"'
+
+          curl -fsS http://127.0.0.1:8787/ | grep -qi '<div id="root">'
+          echo "API contract verified"

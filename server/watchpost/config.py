@@ -11,7 +11,7 @@ import logging
 import threading
 from pathlib import Path
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
@@ -46,27 +46,18 @@ class Settings(BaseModel):
     # Start monitoring as soon as the host comes up.
     arm_on_start: bool = False
 
-    @model_validator(mode="after")
-    def _check_ring_covers_clips(self) -> Settings:
-        """A clip may never outlive the ring segments it is assembled from.
-
-        The janitor keeps ``ring_window_s`` of segments. If an event could run longer than
-        that window, its earliest segments would be deleted before finalize, silently
-        truncating the clip. See docs/backlog.md, "Ring janitor vs. long events".
-        """
-        if self.max_clip_s + self.post_roll_s > self.ring_window_s:
-            raise ValueError(
-                f"max_clip_s ({self.max_clip_s}s) + post_roll_s ({self.post_roll_s}s) exceeds "
-                f"the ring window ({self.ring_window_s}s); the clip would lose its own start"
-            )
-        return self
-
     @property
     def ring_window_s(self) -> float:
         """Seconds of segments the janitor keeps.
 
-        Must cover the longest possible event (pre-roll + max duration + post-roll) plus
-        margin for finalize latency.
+        Derived from the settings rather than configured separately, so it covers the
+        longest possible event — pre-roll plus maximum duration plus post-roll — by
+        construction, with margin for finalize latency. There is deliberately no validator
+        asserting this: it is an identity, and a check on it could never fire.
+
+        This does *not* protect an event that is already in flight when the settings
+        shrink. That case is handled where it actually occurs, by pinning a floor on ring
+        pruning for the life of an event — see ``Application._ring_floor``.
         """
         return self.pre_roll_s + self.max_clip_s + self.post_roll_s + 30.0
 

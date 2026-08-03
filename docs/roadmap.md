@@ -15,12 +15,16 @@ the system being built is described in [`design.md`](design.md).
 |---|---|
 | ✅ | Open the target USB camera on macOS via AVFoundation |
 | ✅ | Capture and hardware-encode H.264 reliably at real time |
-| ⬜ | Run motion detection on the live frame stream |
-| ⬜ | Save a playable event clip with correct pre-roll |
-| ⬜ | Expose a minimal local status endpoint |
-| ⬜ | Verify access from an iPhone on the same network |
+| ✅ | Run motion detection on the live frame stream |
+| ✅ | Save a playable event clip with correct pre-roll |
+| ✅ | Expose a minimal local status endpoint |
+| 🚧 | Verify access from an iPhone on the same network |
 
 **Exit condition:** one end-to-end event can be detected, recorded, and opened from the phone.
+
+**Status (2026-08-03):** the pipeline is verified end to end on a Logitech StreamCam — motion
+produces a playable 1280x720 H.264 clip with correct pre-roll, Range requests return `206`,
+and a clip reaches `readyState 4` in a real browser. Only the physical iPhone check remains.
 
 ---
 
@@ -30,16 +34,16 @@ the system being built is described in [`design.md`](design.md).
 
 | | Deliverable |
 |---|---|
-| ⬜ | Camera enumeration, selection by stable identity, health reporting |
-| ⬜ | Arm and disarm from both the Mac and the phone |
-| ⬜ | Motion-triggered recording with pre-roll and post-roll |
-| ⬜ | Event metadata, thumbnails, and retention |
-| ⬜ | Token authentication and QR pairing |
-| ⬜ | Live status over SSE, consistent across interfaces |
-| ⬜ | Responsive phone interface with live preview |
-| ⬜ | Recent event list and in-browser clip playback |
-| ⬜ | Settings and visible error handling |
-| ⬜ | Tauri desktop shell with sleep prevention |
+| ✅ | Camera enumeration, selection by stable identity, health reporting |
+| ✅ | Arm and disarm from both the Mac and the phone |
+| ✅ | Motion-triggered recording with pre-roll and post-roll |
+| ✅ | Event metadata, thumbnails, and retention |
+| ✅ | Token authentication and QR pairing |
+| ✅ | Live status over SSE, consistent across interfaces |
+| ✅ | Responsive phone interface with live preview |
+| ✅ | Recent event list and in-browser clip playback |
+| ✅ | Settings and visible error handling |
+| ✅ | Tauri desktop shell with sleep prevention |
 
 **Exit condition:** the application can be used daily with one Mac, one camera, and one phone.
 
@@ -61,6 +65,7 @@ the system being built is described in [`design.md`](design.md).
   Workers and Web Push on iOS — see [ADR-0009](adrs/0009-ios-platform-constraints.md).
 - Installation and usage documentation.
 - Automated tests over the camera-in-the-loop path, not just pure logic.
+- A release workflow that builds and publishes a signed `.dmg` on tag.
 
 **Exit condition:** normal failures can be understood and recovered without developer intervention.
 

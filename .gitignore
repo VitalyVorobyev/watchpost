@@ -32,6 +32,6 @@ logs/
 # MPEG-TS ring segments only — never plain *.ts, which would swallow TypeScript sources.
 ring/*.ts
 
-# uv
-.python-version
-uv.lock
+# Lockfiles (server/uv.lock, web/bun.lock, src-tauri/Cargo.lock) and .python-version are
+# deliberately committed: this is an application, not a library, and CI installs with
+# --frozen-lockfile / --locked so builds are reproducible.

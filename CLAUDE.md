@@ -50,12 +50,20 @@ uv run ruff check . && uv run ruff format . # lint and format
 bun install
 bun run dev                                # Vite dev server, proxies /api to :8787
 bun run build                              # emits web/dist, served by the host
+bun run typecheck                          # tsc
 bun run test                               # vitest
 
-# Desktop shell (from repo root)
+# Desktop shell (from src-tauri/)
 cargo tauri dev
-cargo tauri build
+cargo fmt --check && cargo clippy --all-targets -- -D warnings
 ```
+
+CI (`.github/workflows/ci.yml`) runs exactly these, plus a macOS end-to-end job that boots the
+host without a camera and asserts it serves the client and rejects unauthenticated requests.
+Run the same checks locally before pushing.
+
+Lockfiles (`server/uv.lock`, `web/bun.lock`, `src-tauri/Cargo.lock`) are committed and CI
+installs with `--frozen-lockfile` / `--locked`. Update them deliberately, not incidentally.
 
 **Port 8787, not 8765** — 8765 is taken by another project on this machine.
 
@@ -91,6 +99,13 @@ work. Tick completed backlog items and update the matching `roadmap.md` row.
   Starlette's `FileResponse` does not do this.
 - Never select a camera by AVFoundation index — it reorders when a phone appears
   ([ADR-0004](docs/adrs/0004-camera-identity.md)). Resolve `(name, uid)` at every open.
+- Request the device's *exact* advertised frame rate. UVC cameras advertise rationals such as
+  `30.000030` and answer a request for `30` with "Configuration of video device failed", after
+  which capture yields nothing. Use `camera.resolve_mode()`; never format the rate yourself.
+- Do not pin `-pixel_format`. The supported set varies per device and connection speed, and
+  ffmpeg negotiates a working one. Pinning `nv12` broke the development camera.
+- A pipe returns at most 64 KB per syscall, so a ~390 KB frame always arrives in pieces. Read
+  frames with `capture._fill()`; a bare `read(n)` looks like EOF and kills capture.
 - `<img>` and `<video>` cannot set headers, so media endpoints also accept `?t=<token>`.
 - No Service Worker over LAN HTTP. Do not write offline-caching code; it will not run.
 - A closed lid stops capture regardless of `caffeinate`.
